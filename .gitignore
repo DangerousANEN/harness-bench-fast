@@ -216,3 +216,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Local agent debug logs (Claude Code / free-code captures every API
+# request/response under this directory when run from cwd).
+.free-code-logs/
+
+# harness_bench: raw run logs and ad-hoc dumps (kept locally, summarized
+# in README.md).
+harness_bench/runs/
