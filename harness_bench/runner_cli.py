@@ -19,6 +19,7 @@ defaults to operating on its own cwd.
 from __future__ import annotations
 
 import gc
+import json
 import os
 import re
 import shlex
@@ -99,6 +100,92 @@ _CLEANUP_RETRY_DELAYS = (0.1, 0.25, 0.5, 1.0, 2.0)
 
 _PROCESS_TREE_SHUTDOWN_TIMEOUT = 10
 """Seconds to wait for pipes to close after killing a timed-out CLI tree."""
+
+
+def _is_codex_exec_command(argv: list[str]) -> bool:
+    """Return whether argv launches `codex exec` or its short alias."""
+    if not argv:
+        return False
+    executable = Path(argv[0]).name
+    return executable == "codex" and len(argv) > 1 and argv[1] in ("exec", "e")
+
+
+def _ensure_codex_json_events(argv: list[str]) -> list[str]:
+    """Ask Codex exec for JSONL events so runner metrics can count steps."""
+    if not _is_codex_exec_command(argv) or "--json" in argv:
+        return argv
+    return [*argv[:2], "--json", *argv[2:]]
+
+
+def _codex_json_event_stats(stdout: str) -> dict[str, int] | None:
+    """Count Codex JSONL action events emitted by `codex exec --json`.
+
+    `agent_steps` counts completed non-message action items, which maps to
+    concrete actions such as file edits and shell commands rather than prose
+    messages. The raw event count is kept separately for audit/debugging.
+    """
+    events = 0
+    steps = 0
+    tool_calls = 0
+    shell_commands = 0
+    saw_codex_event = False
+
+    for line in stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            payload = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(payload, dict) or not isinstance(payload.get("type"), str):
+            continue
+        saw_codex_event = True
+        events += 1
+        if payload["type"] != "item.completed":
+            continue
+        item = payload.get("item")
+        if not isinstance(item, dict):
+            continue
+        item_type = item.get("type")
+        if item_type == "agent_message":
+            continue
+        steps += 1
+        if item_type == "command_execution":
+            shell_commands += 1
+        else:
+            tool_calls += 1
+
+    if not saw_codex_event:
+        return None
+    return {
+        "agent_steps": steps,
+        "agent_tool_calls": tool_calls,
+        "agent_shell_commands": shell_commands,
+        "agent_events": events,
+    }
+
+
+def _task_run_with_cli_stats(
+    *,
+    task_id: str,
+    passed: bool,
+    message: str,
+    elapsed_seconds: float,
+    result: subprocess.CompletedProcess[str] | None,
+    error: str | None = None,
+    workspace: Path | None = None,
+) -> TaskRun:
+    stats = _codex_json_event_stats(result.stdout or "") if result is not None else None
+    return TaskRun(
+        task_id=task_id,
+        passed=passed,
+        message=message,
+        elapsed_seconds=elapsed_seconds,
+        error=error,
+        workspace=workspace,
+        **(stats or {}),
+    )
 
 
 def _terminate_process_tree(proc: subprocess.Popen[str]) -> None:
@@ -370,7 +457,7 @@ def run_task_cli(
     """
     _load_env_from_dotenv()
     workspace_keepalive: TemporaryDirectory | None = None
-    base_argv = shlex.split(cli_command)
+    base_argv = _ensure_codex_json_events(shlex.split(cli_command))
     last_result: subprocess.CompletedProcess[str] | None = None
     last_transient_excerpt: str | None = None
     started = time.monotonic()
@@ -446,11 +533,12 @@ def run_task_cli(
 
             outcome = task.verify(workspace_path)
             if outcome.passed:
-                return TaskRun(
+                return _task_run_with_cli_stats(
                     task_id=task.id,
                     passed=True,
                     message=outcome.message,
                     elapsed_seconds=time.monotonic() - started,
+                    result=last_result,
                     workspace=workspace_path if keep_workspace else None,
                 )
 
@@ -527,21 +615,23 @@ def run_task_cli(
                         prom_outcome = task.verify(workspace_path)
                         prom_tag = f" [PROM-fallback model={prom_model}]"
                         if prom_outcome.passed:
-                            return TaskRun(
+                            return _task_run_with_cli_stats(
                                 task_id=task.id,
                                 passed=True,
                                 message=prom_outcome.message + prom_tag,
                                 elapsed_seconds=time.monotonic() - started,
+                                result=prom_result,
                                 workspace=workspace_path if keep_workspace else None,
                             )
                         # PROM-fallback also failed — surface its message for visibility.
                         message = f"{message} | PROM-fallback({prom_model}): {prom_outcome.message}"
 
-            return TaskRun(
+            return _task_run_with_cli_stats(
                 task_id=task.id,
                 passed=False,
                 message=message,
                 elapsed_seconds=time.monotonic() - started,
+                result=last_result,
                 workspace=workspace_path if keep_workspace else None,
             )
 

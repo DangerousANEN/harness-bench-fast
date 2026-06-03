@@ -11,6 +11,7 @@ from langgraph.errors import GraphRecursionError
 from harness_bench import __main__ as bench_main
 from harness_bench.core import Task, VerifyResult
 from harness_bench.runner import TaskRun, run_task
+from harness_bench.tasks import get_task
 from harness_bench.verifiers import file_text_equals
 
 
@@ -136,6 +137,102 @@ def test_cli_subprocess_reader_replaces_invalid_utf8(monkeypatch, tmp_path: Path
     assert result.stdout == "ok"
     assert popen_kwargs["encoding"] == "utf-8"
     assert popen_kwargs["errors"] == "replace"
+
+
+def test_cli_injects_codex_json_for_step_metrics() -> None:
+    from harness_bench import runner_cli
+
+    argv = runner_cli._ensure_codex_json_events(
+        ["codex", "exec", "-m", "gpt-5.5", "--dangerously-bypass-approvals-and-sandbox"]
+    )
+
+    assert argv == [
+        "codex",
+        "exec",
+        "--json",
+        "-m",
+        "gpt-5.5",
+        "--dangerously-bypass-approvals-and-sandbox",
+    ]
+    assert runner_cli._ensure_codex_json_events(["codex", "exec", "--json"]) == [
+        "codex",
+        "exec",
+        "--json",
+    ]
+    assert runner_cli._ensure_codex_json_events(["python", "-c", "pass"]) == [
+        "python",
+        "-c",
+        "pass",
+    ]
+
+
+def test_codex_json_event_stats_count_agent_steps() -> None:
+    from harness_bench import runner_cli
+
+    stdout = "\n".join(
+        [
+            '{"type":"thread.started","thread_id":"t"}',
+            '{"type":"turn.started"}',
+            '{"type":"item.completed","item":{"type":"agent_message","text":"Working"}}',
+            '{"type":"item.completed","item":{"type":"file_change","changes":[]}}',
+            (
+                '{"type":"item.completed","item":{"type":"command_execution",'
+                '"command":"pytest","exit_code":0}}'
+            ),
+            '{"type":"turn.completed","usage":{"input_tokens":1}}',
+            "plain text footer",
+        ]
+    )
+
+    assert runner_cli._codex_json_event_stats(stdout) == {
+        "agent_steps": 2,
+        "agent_tool_calls": 1,
+        "agent_shell_commands": 1,
+        "agent_events": 6,
+    }
+    assert runner_cli._codex_json_event_stats("plain text only") is None
+
+
+def test_results_json_includes_agent_step_metrics() -> None:
+    from harness_bench.runner import results_to_payload
+
+    payload = results_to_payload(
+        [
+            TaskRun(
+                "task_fake",
+                True,
+                "ok",
+                0.01,
+                agent_steps=2,
+                agent_tool_calls=1,
+                agent_shell_commands=1,
+                agent_events=6,
+            )
+        ]
+    )
+
+    task = payload["tasks"][0]
+    assert task["agent_steps"] == 2
+    assert task["agent_tool_calls"] == 1
+    assert task["agent_shell_commands"] == 1
+    assert task["agent_events"] == 6
+
+
+def test_task_203_accepts_valid_markdown_alignment(tmp_path: Path) -> None:
+    (tmp_path / "team_report.md").write_text(
+        "| team | open | closed | closed_hours |\n"
+        "| --- | ---: | ---: | ---: |\n"
+        "| alpha | 1 | 2 | 8 |\n"
+        "| beta | 2 | 1 | 2 |\n"
+        "| gamma | 0 | 2 | 8 |\n"
+        "\n"
+        "TOTAL_OPEN=3\n",
+        encoding="utf-8",
+    )
+
+    result = get_task("task_203_sqlite_team_markdown_report").verify(tmp_path)
+
+    assert result.passed is True
 
 
 def test_text_verifier_reports_non_utf8_files_without_traceback(tmp_path: Path) -> None:

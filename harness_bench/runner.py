@@ -65,6 +65,10 @@ class TaskRun:
     workspace: Path | None = None
     attempt: int = 1
     attempts: int = 1
+    agent_steps: int | None = None
+    agent_tool_calls: int | None = None
+    agent_shell_commands: int | None = None
+    agent_events: int | None = None
 
 
 def _load_env_from_dotenv() -> None:
@@ -420,6 +424,10 @@ def results_to_payload(results: list[TaskRun]) -> dict[str, Any]:
                 "tags": tags,
                 "attempt": r.attempt,
                 "attempts": r.attempts,
+                "agent_steps": r.agent_steps,
+                "agent_tool_calls": r.agent_tool_calls,
+                "agent_shell_commands": r.agent_shell_commands,
+                "agent_events": r.agent_events,
             }
         )
     return {
