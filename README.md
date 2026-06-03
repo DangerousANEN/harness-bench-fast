@@ -63,6 +63,20 @@ uv run python -m harness_bench run-cli \
     --cli-command 'free-code -p --model haiku --dangerously-skip-permissions' \
     --concurrency 5
 
+# Repeat every selected task 5 times and print pass@K / pass^K
+# task-count metrics for K=1..5. Works for run, run-openrouter,
+# run-pure, and run-cli.
+uv run python -m harness_bench run-cli \
+    --cli-command 'free-code -p --model haiku --dangerously-skip-permissions' \
+    --attempts 5 --concurrency 5
+
+# Restrict the repeated-attempt summary to specific K values and write
+# the full per-attempt report as JSON.
+uv run python -m harness_bench run-cli \
+    --cli-command 'free-code -p --model haiku --dangerously-skip-permissions' \
+    --attempts 5 --pass@ 1 --pass@ 5 --pass^ 5 \
+    --json-output results.json
+
 # Drive `opencode` against any OpenAI-compatible deployment (example:
 # Qwen3.6-27B-FP8 served by vLLM). Point OPENCODE_CONFIG at a config
 # that registers a custom openai-compatible provider, sets the thinking
