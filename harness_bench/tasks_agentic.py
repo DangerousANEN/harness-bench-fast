@@ -1,7 +1,7 @@
 """Agentic benchmark-inspired tasks (254..298).
 
-This wave adapts patterns from Terminal-Bench, tau2-bench, and SWE-bench
-into the compact harness-bench format: terminal/data workflows, policy-bound
+This wave contains synthetic Terminal-Bench-like, tau-like, and SWE-bench-like
+tasks in the compact harness-bench format: terminal/data workflows, policy-bound
 tool decisions, and repository bug fixes with pytest.
 """
 
@@ -100,7 +100,7 @@ endpoint,status,count
 TASK_254 = Task(
     id="task_254_terminal_log_status_matrix",
     name="Build an endpoint/status matrix from access.log",
-    tags=("terminal-bench", "logs", "csv", "execute", "hard"),
+    tags=("terminal-bench-like", "logs", "csv", "execute", "hard"),
     prompt=(
         "В файле access.log лежат строки формата: timestamp host method endpoint"
         " status latency_ms. Создай report/status_matrix.csv с заголовком"
@@ -141,7 +141,7 @@ _PROCESS_REPORT_255 = {
 TASK_255 = Task(
     id="task_255_terminal_process_hotspots",
     name="Summarize CPU and memory hotspots from ps output",
-    tags=("terminal-bench", "process", "json", "hard"),
+    tags=("terminal-bench-like", "process", "json", "hard"),
     prompt=(
         "В ps.txt лежит таблица с колонками USER PID %CPU %MEM COMMAND."
         " Создай process_hotspots.json с двумя списками: cpu_hot для процессов"
@@ -191,7 +191,7 @@ def _verify_task_256(ws: Path) -> VerifyResult:
 TASK_256 = Task(
     id="task_256_terminal_event_summary",
     name="Normalize shell-style event lines into JSON",
-    tags=("terminal-bench", "parse", "json", "execute", "hard"),
+    tags=("terminal-bench-like", "parse", "json", "execute", "hard"),
     prompt=(
         "Прочитай raw_events.txt. Каждая строка начинается с уровня INFO/WARN/"
         "ERROR, дальше key=value поля job, attempt, duration_ms. Создай"
@@ -206,7 +206,7 @@ TASK_256 = Task(
 
 
 # ---------------------------------------------------------------------------
-# 257. tau2-style airline policy refusal
+# 257. tau-like airline policy refusal
 # ---------------------------------------------------------------------------
 _AIRLINE_STATE_257 = {
     "reservation_id": "EHGLP3",
@@ -245,7 +245,7 @@ def _verify_task_257(ws: Path) -> VerifyResult:
 TASK_257 = Task(
     id="task_257_tau2_airline_refusal",
     name="Choose a policy-compliant airline cancellation action",
-    tags=("tau2", "policy", "json", "hard"),
+    tags=("tau-like", "policy", "json", "hard"),
     prompt=(
         "Смоделируй финальный tool-call для airline-сценария. Клиент Emma Kim"
         " хочет отменить бронь EHGLP3 и утверждает, что ей говорили про"
@@ -271,7 +271,7 @@ TASK_257 = Task(
 
 
 # ---------------------------------------------------------------------------
-# 258. tau2-style retail order action
+# 258. tau-like retail order action
 # ---------------------------------------------------------------------------
 _ORDER_258 = {
     "order_id": "R-1042",
@@ -307,7 +307,7 @@ def _verify_task_258(ws: Path) -> VerifyResult:
 TASK_258 = Task(
     id="task_258_tau2_retail_partial_return",
     name="Produce a partial retail return action",
-    tags=("tau2", "policy", "json", "hard"),
+    tags=("tau-like", "policy", "json", "hard"),
     prompt=(
         "Покупатель просит вернуть оба товара из заказа R-1042. По policy.md"
         " реши, какие позиции можно принять. Создай retail_action.json с"
@@ -331,7 +331,7 @@ TASK_258 = Task(
 
 
 # ---------------------------------------------------------------------------
-# 259. tau2-style telecom plan migration
+# 259. tau-like telecom plan migration
 # ---------------------------------------------------------------------------
 _TELECOM_STATE_259 = {
     "account_id": "acct-91",
@@ -369,7 +369,7 @@ def _verify_task_259(ws: Path) -> VerifyResult:
 TASK_259 = Task(
     id="task_259_tau2_telecom_plan_switch",
     name="Select a telecom plan switch action",
-    tags=("tau2", "policy", "json", "hard"),
+    tags=("tau-like", "policy", "json", "hard"),
     prompt=(
         "Клиент хочет самый дешевый тариф, который покроет текущее суммарное"
         " потребление всех линий без овердрафта. Используй account.json и"
@@ -394,7 +394,7 @@ TASK_259 = Task(
 
 
 # ---------------------------------------------------------------------------
-# 260. SWE-bench-style version parsing bug
+# 260. SWE-bench-like version parsing bug
 # ---------------------------------------------------------------------------
 _VERSIONS_PY_260 = """\
 def normalize_version(raw: str) -> tuple[int, ...]:
@@ -458,7 +458,7 @@ TASK_260 = Task(
 
 
 # ---------------------------------------------------------------------------
-# 261. SWE-bench-style config precedence bug
+# 261. SWE-bench-like config precedence bug
 # ---------------------------------------------------------------------------
 _SETTINGS_PY_261 = """\
 import os
@@ -525,7 +525,7 @@ TASK_261 = Task(
 
 
 # ---------------------------------------------------------------------------
-# 262. SWE-bench-style CSV edge case
+# 262. SWE-bench-like CSV edge case
 # ---------------------------------------------------------------------------
 _REPORTS_PY_262 = """\
 import csv
@@ -622,7 +622,7 @@ src/web	44
 TASK_263 = Task(
     id="task_263_terminal_du_top_dirs",
     name="Extract top directories from du-style output",
-    tags=("terminal-bench", "parse", "text", "execute", "hard"),
+    tags=("terminal-bench-like", "parse", "text", "execute", "hard"),
     prompt=(
         "В файле du.txt лежит вывод, похожий на `du -h`, но все размеры уже"
         " в KiB и записаны как '<N>K <path>'. Создай reports/top_dirs.tsv:"
@@ -648,7 +648,7 @@ TIMEOUT=45
 TASK_264 = Task(
     id="task_264_terminal_env_precedence",
     name="Merge env files with CLI precedence",
-    tags=("terminal-bench", "config", "text", "hard"),
+    tags=("terminal-bench-like", "config", "text", "hard"),
     prompt=(
         "Собери effective.env из трех файлов: env/defaults.env,"
         " env/local.env, env/cli.env. Приоритет значений:"
@@ -679,7 +679,7 @@ deploy
 TASK_265 = Task(
     id="task_265_terminal_makefile_plan",
     name="Resolve a Makefile target dependency order",
-    tags=("terminal-bench", "makefile", "dependency", "hard"),
+    tags=("terminal-bench-like", "makefile", "dependency", "hard"),
     prompt=(
         "В Makefile.simple есть targets в формате 'target: dep1 dep2'."
         " Построй build_order.txt для цели deploy: каждый target должен"
@@ -737,7 +737,7 @@ def _verify_task_266(ws: Path) -> VerifyResult:
 TASK_266 = Task(
     id="task_266_terminal_sha256_manifest",
     name="Create a deterministic SHA256 manifest",
-    tags=("terminal-bench", "hash", "manifest", "execute", "hard"),
+    tags=("terminal-bench-like", "hash", "manifest", "execute", "hard"),
     prompt=(
         "Для всех обычных файлов внутри каталога payload создай SHA256SUMS."
         " Формат каждой строки как у sha256sum: '<hex>  <relative-path>'."
@@ -763,7 +763,7 @@ _JOB_REPORT_267 = {
 TASK_267 = Task(
     id="task_267_terminal_job_log_report",
     name="Summarize job failures and slowest duration",
-    tags=("terminal-bench", "logs", "json", "hard"),
+    tags=("terminal-bench-like", "logs", "json", "hard"),
     prompt=(
         "Прочитай jobs.log. Каждая строка: '<timestamp> job=<name>"
         " status=<ok|failed> duration_s=<N>'. Создай job_report.json с"
@@ -794,7 +794,7 @@ secrets/token.txt	world-readable
 TASK_268 = Task(
     id="task_268_terminal_permission_audit",
     name="Audit risky file permissions from ls output",
-    tags=("terminal-bench", "permissions", "security", "hard"),
+    tags=("terminal-bench-like", "permissions", "security", "hard"),
     prompt=(
         "В ls_permissions.txt лежит вывод `ls -l` с путями в последней колонке."
         " Создай permission_findings.tsv без заголовка. Добавь строку"
@@ -830,7 +830,7 @@ docs/guide/install.md	Install Guide
 TASK_269 = Task(
     id="task_269_terminal_markdown_index",
     name="Build an index from markdown H1 headings",
-    tags=("terminal-bench", "markdown", "search", "hard"),
+    tags=("terminal-bench-like", "markdown", "search", "hard"),
     prompt=(
         "Найди все .md-файлы внутри docs. Для каждого возьми первый заголовок"
         " первого уровня (# Title) и создай docs_index.tsv в корне. Формат"
@@ -848,7 +848,7 @@ TASK_269 = Task(
 
 
 # ---------------------------------------------------------------------------
-# 270..254. tau2-style policy tasks
+# 270..254. tau-like policy tasks
 # ---------------------------------------------------------------------------
 _BANK_ACTION_270 = {
     "action": "open_dispute",
@@ -860,7 +860,7 @@ _BANK_ACTION_270 = {
 TASK_270 = Task(
     id="task_270_tau2_bank_duplicate_charge",
     name="Choose a bank dispute action for duplicate charge",
-    tags=("tau2", "policy", "json", "hard"),
+    tags=("tau-like", "policy", "json", "hard"),
     prompt=(
         "Клиент оспаривает повторное списание. Используй transaction.json и"
         " policy.md. Создай bank_action.json с action, transaction_id,"
@@ -902,7 +902,7 @@ _HOTEL_ACTION_271 = {
 TASK_271 = Task(
     id="task_271_tau2_hotel_late_checkout",
     name="Select hotel late-checkout action",
-    tags=("tau2", "policy", "json", "hard"),
+    tags=("tau-like", "policy", "json", "hard"),
     prompt=(
         "Гость просит late checkout до 16:00. По reservation.json и"
         " hotel_policy.md создай hotel_action.json с action, reservation_id,"
@@ -936,7 +936,7 @@ _CLINIC_ACTION_272 = {
 TASK_272 = Task(
     id="task_272_tau2_clinic_reschedule",
     name="Pick a clinic reschedule slot",
-    tags=("tau2", "policy", "json", "hard"),
+    tags=("tau-like", "policy", "json", "hard"),
     prompt=(
         "Пациент просит ближайший утренний слот у того же врача. Используй"
         " appointment.json и slots.json. Утренние слоты начинаются до 12:00."
@@ -974,7 +974,7 @@ _INSURANCE_ACTION_273 = {
 TASK_273 = Task(
     id="task_273_tau2_insurance_docs",
     name="Request missing insurance claim documents",
-    tags=("tau2", "policy", "json", "hard"),
+    tags=("tau-like", "policy", "json", "hard"),
     prompt=(
         "По claim.json и policy.md реши, можно ли одобрить claim. Создай"
         " insurance_action.json с action, claim_id, missing_documents,"
@@ -1004,7 +1004,7 @@ _DELIVERY_ACTION_274 = {
 TASK_274 = Task(
     id="task_274_tau2_delivery_late_food",
     name="Apply food delivery late-order policy",
-    tags=("tau2", "policy", "json", "hard"),
+    tags=("tau-like", "policy", "json", "hard"),
     prompt=(
         "Заказ еды доставлен с опозданием. Используй delivery.json и"
         " policy.md. Создай delivery_action.json с action, order_id,"
@@ -1043,7 +1043,7 @@ _SUBSCRIPTION_ACTION_275 = {
 TASK_275 = Task(
     id="task_275_tau2_subscription_downgrade",
     name="Schedule a subscription downgrade",
-    tags=("tau2", "policy", "json", "hard"),
+    tags=("tau-like", "policy", "json", "hard"),
     prompt=(
         "Пользователь хочет перейти с pro на basic. По subscription.json и"
         " policy.md создай subscription_action.json с action, account_id,"
@@ -1080,7 +1080,7 @@ _BAGGAGE_ACTION_276 = {
 TASK_276 = Task(
     id="task_276_tau2_baggage_delay",
     name="Calculate baggage delay compensation",
-    tags=("tau2", "policy", "json", "hard"),
+    tags=("tau-like", "policy", "json", "hard"),
     prompt=(
         "По baggage_case.json и policy.md создай baggage_action.json с"
         " action, case_id, compensation_usd, escalate. Значение action —"
@@ -1099,7 +1099,7 @@ TASK_276 = Task(
 
 
 # ---------------------------------------------------------------------------
-# 277..261. SWE-bench-style pytest bug fixes
+# 277..261. SWE-bench-like pytest bug fixes
 # ---------------------------------------------------------------------------
 _DATES_PY_277 = """\
 from datetime import datetime
@@ -1467,7 +1467,7 @@ TASK_283 = Task(
 
 
 # ---------------------------------------------------------------------------
-# 284..266. more Terminal-Bench-style tasks
+# 284..266. more Terminal-Bench-like tasks
 # ---------------------------------------------------------------------------
 _PORTS_284 = {
     "services/api/config.json": '{\n  "service": "api",\n  "port": 8080,\n  "enabled": true\n}\n',
@@ -1485,7 +1485,7 @@ web	3000
 TASK_284 = Task(
     id="task_284_terminal_json_config_inventory",
     name="Inventory enabled service ports from JSON configs",
-    tags=("terminal-bench", "json", "config", "hard"),
+    tags=("terminal-bench-like", "json", "config", "hard"),
     prompt=(
         "В services/*/config.json лежат конфиги сервисов с полями service,"
         " port, enabled. Создай enabled_ports.tsv: только enabled=true,"
@@ -1506,7 +1506,7 @@ deletions	3
 TASK_285 = Task(
     id="task_285_terminal_patch_stat_summary",
     name="Summarize git patch statistics",
-    tags=("terminal-bench", "patch", "text", "hard"),
+    tags=("terminal-bench-like", "patch", "text", "hard"),
     prompt=(
         "В patch.diff лежит unified diff. Посчитай files_changed,"
         " insertions и deletions. Строки заголовков diff (+++ и ---) не"
@@ -1544,7 +1544,7 @@ _NGINX_REPORT_286 = """\
 TASK_286 = Task(
     id="task_286_terminal_nginx_endpoint_classes",
     name="Classify nginx endpoint successes and failures",
-    tags=("terminal-bench", "logs", "text", "hard"),
+    tags=("terminal-bench-like", "logs", "text", "hard"),
     prompt=(
         "Прочитай nginx.log. Для каждого endpoint посчитай success"
         " (status 200-399) и failure (все остальные). Создай"
@@ -1569,7 +1569,7 @@ _RELEASE_NOTES_287 = """\
 TASK_287 = Task(
     id="task_287_terminal_changelog_extract",
     name="Extract release note sections from changelog",
-    tags=("terminal-bench", "markdown", "text", "medium"),
+    tags=("terminal-bench-like", "markdown", "text", "medium"),
     prompt=(
         "В CHANGELOG.md найди секцию версии 1.2.0 и создай"
         " release_notes.md, содержащий только подразделы Added и Fixed"
@@ -1600,7 +1600,7 @@ artifacts/app-windows.zip
 TASK_288 = Task(
     id="task_288_terminal_artifact_filter",
     name="Filter release artifacts by manifest flags",
-    tags=("terminal-bench", "json", "text", "hard"),
+    tags=("terminal-bench-like", "json", "text", "hard"),
     prompt=(
         "В artifacts.json список артефактов с fields path, type, draft."
         " Создай publish_artifacts.txt: path для type='binary' и draft=false,"
@@ -1625,7 +1625,7 @@ TASK_288 = Task(
 
 
 # ---------------------------------------------------------------------------
-# 289..271. more tau2-style policy tasks
+# 289..271. more tau-like policy tasks
 # ---------------------------------------------------------------------------
 _UTILITY_ACTION_289 = {
     "action": "create_payment_plan",
@@ -1638,7 +1638,7 @@ _UTILITY_ACTION_289 = {
 TASK_289 = Task(
     id="task_289_tau2_utility_payment_plan",
     name="Choose utility payment-plan action",
-    tags=("tau2", "policy", "json", "hard"),
+    tags=("tau-like", "policy", "json", "hard"),
     prompt=(
         "Клиент просит избежать отключения. По utility_account.json и"
         " policy.md создай utility_action.json с action, account_id,"
@@ -1669,7 +1669,7 @@ _CAR_ACTION_290 = {
 TASK_290 = Task(
     id="task_290_tau2_car_rental_fee",
     name="Apply car rental cleaning-fee policy",
-    tags=("tau2", "policy", "json", "hard"),
+    tags=("tau-like", "policy", "json", "hard"),
     prompt=(
         "По rental.json и policy.md создай car_action.json с action,"
         " rental_id, fee_usd, reason. Значение action — charge_cleaning_fee."
@@ -1700,7 +1700,7 @@ _EDU_ACTION_291 = {
 TASK_291 = Task(
     id="task_291_tau2_student_extension",
     name="Grant a student assignment extension",
-    tags=("tau2", "policy", "json", "hard"),
+    tags=("tau-like", "policy", "json", "hard"),
     prompt=(
         "Студент просит extension из-за подтвержденной болезни. По"
         " request.json и policy.md создай edu_action.json с action,"
@@ -1737,7 +1737,7 @@ _PHARMACY_ACTION_292 = {
 TASK_292 = Task(
     id="task_292_tau2_pharmacy_refill",
     name="Refuse an early controlled refill",
-    tags=("tau2", "policy", "json", "hard"),
+    tags=("tau-like", "policy", "json", "hard"),
     prompt=(
         "Пациент просит refill. По prescription.json и policy.md создай"
         " pharmacy_action.json с action, prescription_id, days_until_eligible,"
@@ -1770,7 +1770,7 @@ _EVENT_ACTION_293 = {
 TASK_293 = Task(
     id="task_293_tau2_event_ticket_exchange",
     name="Exchange an event ticket under policy",
-    tags=("tau2", "policy", "json", "hard"),
+    tags=("tau-like", "policy", "json", "hard"),
     prompt=(
         "Клиент хочет обменять билет на show-b. По ticket.json,"
         " events.json и policy.md создай event_action.json с action,"
@@ -1793,7 +1793,7 @@ TASK_293 = Task(
 
 
 # ---------------------------------------------------------------------------
-# 294..276. more SWE-bench-style pytest bug fixes
+# 294..276. more SWE-bench-like pytest bug fixes
 # ---------------------------------------------------------------------------
 _MONEY_PY_294 = """\
 def cents(value: str) -> int:

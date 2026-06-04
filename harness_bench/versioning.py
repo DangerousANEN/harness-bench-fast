@@ -81,8 +81,8 @@ TASK_SET_REVISIONS: tuple[TaskSetRevision, ...] = (
         added_task_numbers=(254, 262),
         modules=("tasks_agentic.py",),
         notes=(
-            "Added benchmark-inspired agentic tasks adapted from Terminal-Bench, "
-            "tau2-bench, and SWE-bench patterns."
+            "Added synthetic Terminal-Bench-like, tau-like, and "
+            "SWE-bench-like agentic tasks."
         ),
     ),
     TaskSetRevision(
@@ -92,8 +92,8 @@ TASK_SET_REVISIONS: tuple[TaskSetRevision, ...] = (
         added_task_numbers=(263, 283),
         modules=("tasks_agentic.py",),
         notes=(
-            "Expanded the agentic wave to 10 Terminal-Bench-style, "
-            "10 tau2-style, and 10 SWE-bench-style tasks."
+            "Expanded the agentic wave to 10 Terminal-Bench-like, "
+            "10 tau-like, and 10 SWE-bench-like tasks."
         ),
     ),
     TaskSetRevision(
@@ -103,8 +103,8 @@ TASK_SET_REVISIONS: tuple[TaskSetRevision, ...] = (
         added_task_numbers=(284, 298),
         modules=("tasks_agentic.py",),
         notes=(
-            "Expanded the agentic wave to 15 Terminal-Bench-style, "
-            "15 tau2-style, and 15 SWE-bench-style tasks."
+            "Expanded the agentic wave to 15 Terminal-Bench-like, "
+            "15 tau-like, and 15 SWE-bench-like tasks."
         ),
     ),
 )

@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>harness-bench results</title>
+    <meta
+      name="description"
+      content="Latest harness-bench v0.7.0 results across agent harnesses and models."
+    >
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <header class="site-header">
+      <nav class="nav" aria-label="Primary">
+        <a class="brand" href="https://github.com/ai-forever/harness-bench-fast">
+          harness-bench
+        </a>
+        <div class="nav-links">
+          <a href="#leaderboard">Leaderboard</a>
+          <a href="#tasks">Task Set</a>
+          <a href="https://github.com/ai-forever/harness-bench-fast">GitHub</a>
+        </div>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero" aria-labelledby="title">
+        <div class="hero-copy">
+          <p class="eyebrow">Latest benchmark: task-set v0.7.0</p>
+          <h1 id="title">298 mechanically verified coding-agent tasks</h1>
+          <p class="lead">
+            A compact benchmark for comparing agent harnesses on file edits,
+            data transforms, pytest bug fixes, memory discipline, and
+            synthetic benchmark-like workflows.
+          </p>
+          <div class="hero-actions">
+            <a class="button primary" href="#leaderboard">View results</a>
+            <a class="button secondary" href="https://github.com/ai-forever/harness-bench-fast">
+              Run the bench
+            </a>
+          </div>
+        </div>
+
+        <div class="score-panel" aria-label="Benchmark summary">
+          <div class="summary-grid">
+            <div>
+              <span class="metric">298</span>
+              <span class="label">tasks</span>
+            </div>
+            <div>
+              <span class="metric">17</span>
+              <span class="label">runs listed</span>
+            </div>
+            <div>
+              <span class="metric">2</span>
+              <span class="label">perfect runs</span>
+            </div>
+            <div>
+              <span class="metric">100%</span>
+              <span class="label">top score</span>
+            </div>
+          </div>
+
+          <div class="mini-bars" aria-label="Top score bars">
+            <div class="bar-row">
+              <span>Claude Code CLI / Opus 4.8</span>
+              <strong>100.0%</strong>
+              <i style="--score: 100%"></i>
+            </div>
+            <div class="bar-row">
+              <span>Codex CLI / GPT-5.5</span>
+              <strong>100.0%</strong>
+              <i style="--score: 100%"></i>
+            </div>
+            <div class="bar-row">
+              <span>free-code / Haiku 4.5</span>
+              <strong>95.3%</strong>
+              <i style="--score: 95.3%"></i>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="task-strip" id="tasks" aria-label="Task set composition">
+        <div>
+          <span class="strip-number">1-253</span>
+          <span>File, code, data, diagnostic, and memory tasks</span>
+        </div>
+        <div>
+          <span class="strip-number">254-298</span>
+          <span>Terminal-Bench-like, tau-like, and SWE-bench-like synthetic tasks</span>
+        </div>
+        <div>
+          <span class="strip-number">0</span>
+          <span>LLM-as-judge checks</span>
+        </div>
+      </section>
+
+      <section class="section" id="leaderboard" aria-labelledby="leaderboard-title">
+        <div class="section-heading">
+          <p class="eyebrow">Current results only</p>
+          <h2 id="leaderboard-title">Leaderboard</h2>
+          <p>
+            Results below use the latest 298-task set. Steps and tokens are
+            shown only when the harness exposes them.
+          </p>
+        </div>
+
+        <div class="leaderboard">
+          <article class="result-row perfect">
+            <div class="rank">1</div>
+            <div class="who">
+              <h3>Claude Code CLI</h3>
+              <p>Claude Opus 4.8</p>
+            </div>
+            <div class="score">298/298</div>
+            <div class="percent">100.0%</div>
+            <div class="bar"><span style="width: 100%"></span></div>
+            <div class="meta">Steps — · Tokens —</div>
+          </article>
+
+          <article class="result-row perfect">
+            <div class="rank">1</div>
+            <div class="who">
+              <h3>Codex CLI</h3>
+              <p>GPT-5.5</p>
+            </div>
+            <div class="score">298/298</div>
+            <div class="percent">100.0%</div>
+            <div class="bar"><span style="width: 100%"></span></div>
+            <div class="meta">Steps — · Tokens —</div>
+          </article>
+
+          <article class="result-row">
+            <div class="rank">3</div>
+            <div class="who">
+              <h3>free-code</h3>
+              <p>Claude Haiku 4.5</p>
+            </div>
+            <div class="score">284/298</div>
+            <div class="percent">95.3%</div>
+            <div class="bar"><span style="width: 95.3%"></span></div>
+            <div class="meta">Steps — · Tokens —</div>
+          </article>
+
+          <article class="result-row">
+            <div class="rank">4</div>
+            <div class="who">
+              <h3>deepagents + Anthropic profile</h3>
+              <p>Claude Haiku 4.5</p>
+            </div>
+            <div class="score">280/298</div>
+            <div class="percent">94.0%</div>
+            <div class="bar"><span style="width: 94%"></span></div>
+            <div class="meta">Steps 3,016 · Tokens 41,405,850</div>
+          </article>
+
+          <article class="result-row">
+            <div class="rank">5</div>
+            <div class="who">
+              <h3>deepagents + Anthropic profile</h3>
+              <p>Claude Sonnet 4.6</p>
+            </div>
+            <div class="score">279/298</div>
+            <div class="percent">93.6%</div>
+            <div class="bar"><span style="width: 93.6%"></span></div>
+            <div class="meta">Steps 2,894 · Tokens 39,695,400</div>
+          </article>
+
+          <article class="result-row">
+            <div class="rank">6</div>
+            <div class="who">
+              <h3>deepagents</h3>
+              <p>Qwen 3.6 Flash</p>
+            </div>
+            <div class="score">277/298</div>
+            <div class="percent">93.0%</div>
+            <div class="bar"><span style="width: 93%"></span></div>
+            <div class="meta">Steps 3,132 · Tokens 35,108,655</div>
+          </article>
+
+          <article class="result-row">
+            <div class="rank">7</div>
+            <div class="who">
+              <h3>deepagents</h3>
+              <p>DeepSeek V4 Flash</p>
+            </div>
+            <div class="score">266/298</div>
+            <div class="percent">89.3%</div>
+            <div class="bar"><span style="width: 89.3%"></span></div>
+            <div class="meta">Steps 3,489 · Tokens 40,392,075</div>
+          </article>
+
+          <article class="result-row">
+            <div class="rank">8</div>
+            <div class="who">
+              <h3>deepagents</h3>
+              <p>Qwen 3.6 Plus</p>
+            </div>
+            <div class="score">265/298</div>
+            <div class="percent">88.9%</div>
+            <div class="bar"><span style="width: 88.9%"></span></div>
+            <div class="meta">Steps 3,288 · Tokens 37,687,035</div>
+          </article>
+
+          <article class="result-row">
+            <div class="rank">9</div>
+            <div class="who">
+              <h3>Hermes CLI</h3>
+              <p>Claude Sonnet 4.6</p>
+            </div>
+            <div class="score">262/298</div>
+            <div class="percent">87.9%</div>
+            <div class="bar"><span style="width: 87.9%"></span></div>
+            <div class="meta">Steps — · Tokens —</div>
+          </article>
+
+          <article class="result-row">
+            <div class="rank">10</div>
+            <div class="who">
+              <h3>deepagents</h3>
+              <p>GPT-4.1 Mini</p>
+            </div>
+            <div class="score">245/298</div>
+            <div class="percent">82.2%</div>
+            <div class="bar"><span style="width: 82.2%"></span></div>
+            <div class="meta">Steps 2,754 · Tokens 27,705,519</div>
+          </article>
+
+          <article class="result-row">
+            <div class="rank">11</div>
+            <div class="who">
+              <h3>deepagents</h3>
+              <p>Qwen 3.5 Flash</p>
+            </div>
+            <div class="score">241/298</div>
+            <div class="percent">80.9%</div>
+            <div class="bar"><span style="width: 80.9%"></span></div>
+            <div class="meta">Steps 2,677 · Tokens 30,564,414</div>
+          </article>
+
+          <article class="result-row">
+            <div class="rank">12</div>
+            <div class="who">
+              <h3>deepagents + GigaChat profile</h3>
+              <p>GigaChat-3-Ultra PROM</p>
+            </div>
+            <div class="score">231/298</div>
+            <div class="percent">77.5%</div>
+            <div class="bar"><span style="width: 77.5%"></span></div>
+            <div class="meta">Steps 1,466 · Tokens 9,307,062</div>
+          </article>
+
+          <article class="result-row">
+            <div class="rank">12</div>
+            <div class="who">
+              <h3>deepagents</h3>
+              <p>GLM 4.7 Flash</p>
+            </div>
+            <div class="score">231/298</div>
+            <div class="percent">77.5%</div>
+            <div class="bar"><span style="width: 77.5%"></span></div>
+            <div class="meta">Steps 3,019 · Tokens 34,373,385</div>
+          </article>
+
+          <article class="result-row">
+            <div class="rank">14</div>
+            <div class="who">
+              <h3>pi-mono</h3>
+              <p>GigaChat-3-Ultra PROM</p>
+            </div>
+            <div class="score">226/298</div>
+            <div class="percent">75.8%</div>
+            <div class="bar"><span style="width: 75.8%"></span></div>
+            <div class="meta">Steps — · Tokens —</div>
+          </article>
+
+          <article class="result-row">
+            <div class="rank">15</div>
+            <div class="who">
+              <h3>deepagents, no profile</h3>
+              <p>GigaChat-3-Ultra PROM</p>
+            </div>
+            <div class="score">200/298</div>
+            <div class="percent">67.1%</div>
+            <div class="bar"><span style="width: 67.1%"></span></div>
+            <div class="meta">Steps 2,569 · Tokens 18,516,153</div>
+          </article>
+
+          <article class="result-row">
+            <div class="rank">16</div>
+            <div class="who">
+              <h3>deepagents</h3>
+              <p>GPT-OSS-120B</p>
+            </div>
+            <div class="score">167/298</div>
+            <div class="percent">56.0%</div>
+            <div class="bar"><span style="width: 56%"></span></div>
+            <div class="meta">Steps 1,756 · Tokens 18,889,569</div>
+          </article>
+
+          <article class="result-row">
+            <div class="rank">17</div>
+            <div class="who">
+              <h3>deepagents</h3>
+              <p>GPT-4.1 Nano</p>
+            </div>
+            <div class="score">149/298</div>
+            <div class="percent">50.0%</div>
+            <div class="bar"><span style="width: 50%"></span></div>
+            <div class="meta">Steps 2,372 · Tokens 30,104,298</div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section compact" aria-labelledby="method-title">
+        <div class="method">
+          <div>
+            <p class="eyebrow">Verification</p>
+            <h2 id="method-title">No LLM judge</h2>
+          </div>
+          <p>
+            Each task is checked mechanically: exact files, JSON shape and
+            values, pytest outcomes, SQLite/XLSX checks, regex matches, and
+            deterministic command outputs.
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span>harness-bench · latest results for task-set v0.7.0</span>
+      <a href="https://github.com/ai-forever/harness-bench-fast">Source on GitHub</a>
+    </footer>
+  </body>
+</html>

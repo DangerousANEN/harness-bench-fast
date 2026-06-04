@@ -6,6 +6,8 @@ Current benchmark results use the 298-task set (`task-set v0.7.0`). Older
 task-set histories live in [`LEGACY_RESULTS.md`](LEGACY_RESULTS.md). `Steps`
 and `Tokens` are shown when the runner exposes them.
 
+Public landing page: <https://ai-forever.github.io/harness-bench-fast/>
+
 | Harness | Model | Result | % | Steps | Tokens |
 | --- | --- | ---: | ---: | ---: | ---: |
 | Claude Code CLI | Claude Opus 4.8 | 298/298 | 100.0% | — | — |
@@ -180,7 +182,7 @@ uv run python -m harness_bench apply-gold \
 | `tasks_extreme.py` | 151–205 | composite pipelines, archives, project-wide refactors, algorithms with pytest, statistics, XML / markdown, three-way joins |
 | `tasks_diagnostic.py` | 206–221 | paid-revenue reconciliation, inventory anomalies, pricing-API migration, latency reconstruction, tar+hash manifests, interval merge, config precedence, markdown link audit, data-quality reports, TODO/FIXME triage, category rollups, email extraction, runtime config, SQL leaderboards, import migrations, log-level summaries |
 | `tasks_memory.py` | 222–253 | memory discipline: read / write / forget / refuse facts in `MEMORY.md` along with the auxiliary deliverable (LICENSE, `requirements-dev.txt`, `bio.txt`, `profile.json`, …). Exercises agent memory rather than file I/O. |
-| `tasks_agentic.py` | 254–298 | benchmark-inspired agentic wave adapted from Terminal-Bench (logs, process tables, Makefile plans, checksums, permission audits), tau2-bench (policy-bound action decisions across airline / retail / banking / clinic / etc.), and SWE-bench (pytest bug-fix tasks). |
+| `tasks_agentic.py` | 254–298 | benchmark-like synthetic agentic wave: Terminal-Bench-like terminal workflows (logs, process tables, Makefile plans, checksums, permission audits), tau-like policy-bound action decisions (airline, retail, banking, clinic, etc.), and SWE-bench-like pytest bug-fix tasks. |
 
 Task prompts are in **Russian** — the bench is deliberately bilingual
 to keep models honest. The verifiers and gold answers are English / data
@@ -199,9 +201,9 @@ changes do not need a task-set bump.
 | `0.2.0` | 2026-05-19 | 201–221 | 221 | Advanced composites and diagnostic hard tasks |
 | `0.3.0` | 2026-05-21 | 222–231 | 231 | Memory-discipline tasks using `AGENTS.md` and `MEMORY.md` |
 | `0.4.0` | 2026-06-02 | 232–253 | 253 | Extended memory suite: knowledge update, contradiction resolution, temporal reasoning, abstention, preferences, multi-hop/multi-session |
-| `0.5.0` | 2026-06-02 | 254–262 | 262 | Agentic wave adapted from Terminal-Bench, tau2-bench, and SWE-bench patterns |
-| `0.6.0` | 2026-06-02 | 263–283 | 283 | Agentic wave expanded to 10 Terminal-Bench / 10 tau2 / 10 SWE-bench tasks |
-| `0.7.0` | 2026-06-02 | 284–298 | 298 | Agentic wave expanded to 15 Terminal-Bench / 15 tau2 / 15 SWE-bench tasks |
+| `0.5.0` | 2026-06-02 | 254–262 | 262 | Agentic wave of synthetic Terminal-Bench-like, tau-like, and SWE-bench-like tasks |
+| `0.6.0` | 2026-06-02 | 263–283 | 283 | Agentic wave expanded to 10 Terminal-Bench-like / 10 tau-like / 10 SWE-bench-like tasks |
+| `0.7.0` | 2026-06-02 | 284–298 | 298 | Agentic wave expanded to 15 Terminal-Bench-like / 15 tau-like / 15 SWE-bench-like tasks |
 
 ### Infrastructure
 
