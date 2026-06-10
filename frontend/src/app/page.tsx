@@ -32,6 +32,7 @@ export default function Home() {
   const [selectedRun, setSelectedRun] = useState<any | null>(null);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [selectedBenchmark, setSelectedBenchmark] = useState<any | null>(null);
+  const [runDetailTab, setRunDetailTab] = useState<'table' | 'console'>('table');
   
   // Create Run Form state
   const [runName, setRunName] = useState('');
@@ -837,98 +838,219 @@ export default function Home() {
                 )}
               </div>
 
-              {/* Tasks List Table */}
+              {/* Tasks List Outcomes header */}
               <h3 style={{ fontSize: '1.6rem', marginBottom: '1rem' }}>Task Outcomes</h3>
-              <div className="table-container">
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th style={{ width: '60px' }}>No.</th>
-                      <th>Task Name</th>
-                      <th>Status</th>
-                      <th>Tokens</th>
-                      <th>T/s</th>
-                      <th>Time</th>
-                      <th>Result details / Error message</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {selectedRun.task_results?.map((t: any, idx: number) => (
-                      <React.Fragment key={t.id}>
-                        <tr>
-                          <td style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-dimmed)' }}>{idx + 1}</td>
-                          <td style={{ fontWeight: 600 }}>{t.task_name}</td>
-                          <td>
-                            <span className={`badge badge-${t.status}`}>{t.status}</span>
-                          </td>
-                          <td style={{ fontFamily: 'var(--font-mono)' }}>{t.agent_total_tokens?.toLocaleString() || '-'}</td>
-                          <td style={{ fontFamily: 'var(--font-mono)' }}>{t.tokens_per_second ? t.tokens_per_second.toFixed(1) : '-'}</td>
-                          <td style={{ fontFamily: 'var(--font-mono)' }}>{t.elapsed_seconds ? `${t.elapsed_seconds.toFixed(1)}s` : '-'}</td>
-                          <td style={{ fontSize: '0.85rem' }}>
-                            <div style={{ maxWidth: '400px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {t.message || t.error_detail || '-'}
+
+              {/* Tabs Selector */}
+              <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--border-color)', marginBottom: '1.5rem' }}>
+                <button
+                  className={`btn nav-link ${runDetailTab === 'table' ? 'active' : ''}`}
+                  style={{ border: 'none', paddingBottom: '0.75rem', borderRadius: '0', borderBottom: runDetailTab === 'table' ? '2px solid var(--accent-color)' : 'none', fontWeight: 600, backgroundColor: 'transparent' }}
+                  onClick={() => setRunDetailTab('table')}
+                >
+                  Ledger View (Table)
+                </button>
+                <button
+                  className={`btn nav-link ${runDetailTab === 'console' ? 'active' : ''}`}
+                  style={{ border: 'none', paddingBottom: '0.75rem', borderRadius: '0', borderBottom: runDetailTab === 'console' ? '2px solid var(--accent-color)' : 'none', fontWeight: 600, backgroundColor: 'transparent' }}
+                  onClick={() => setRunDetailTab('console')}
+                >
+                  Live Terminal Console
+                </button>
+              </div>
+
+              {runDetailTab === 'console' ? (
+                <div className="card" style={{ backgroundColor: '#121212', border: '1px solid #333', padding: '1.5rem', borderRadius: '4px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px dashed #333', paddingBottom: '0.5rem' }}>
+                    <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent-color)', fontSize: '0.9rem', fontWeight: 'bold' }}>
+                      [SYSTEM TERMINAL CONSOLE LOG STREAM]
+                    </span>
+                    <span style={{ fontFamily: 'var(--font-mono)', color: '#666', fontSize: '0.8rem' }}>
+                      RUN_ID: {selectedRun.id}
+                    </span>
+                  </div>
+                  
+                  <div style={{
+                    maxHeight: '650px',
+                    overflowY: 'auto',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '0.85rem',
+                    color: '#ddd',
+                    lineHeight: '1.5',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '1.5rem',
+                    paddingRight: '0.5rem'
+                  }}>
+                    {selectedRun.task_results?.filter((t: any) => t.status !== 'pending' && t.status !== 'running').length === 0 ? (
+                      <div style={{ color: '#666', fontStyle: 'italic', textAlign: 'center', padding: '2rem' }}>
+                        NO EXECUTION DATA STREAMED YET
+                      </div>
+                    ) : (
+                      selectedRun.task_results?.filter((t: any) => t.status !== 'pending').map((t: any, idx: number) => {
+                        const startStr = t.started_at ? new Date(t.started_at).toLocaleTimeString() : 'N/A';
+                        const endStr = t.finished_at ? new Date(t.finished_at).toLocaleTimeString() : 'N/A';
+                        const durationStr = t.elapsed_seconds ? `${t.elapsed_seconds.toFixed(1)}s` : '';
+                        
+                        // Reconstruct command line
+                        const cmd = selectedRun.harness_type === 'cli'
+                          ? `${selectedRun.cli_command || 'hermes'} "${t.prompt || t.task_name}"`
+                          : `runner_${selectedRun.harness_type} --model "${selectedRun.model || 'default'}" --prompt "${t.prompt || t.task_name}"`;
+
+                        const outcomeColor = t.status === 'passed' ? 'var(--green-color)' : 'var(--red-color)';
+
+                        return (
+                          <div key={t.id} style={{ borderBottom: '1px solid #222', paddingBottom: '1rem' }}>
+                            {/* Invocation */}
+                            <div style={{ color: '#888', marginBottom: '0.5rem' }}>
+                              <span style={{ color: 'var(--accent-color)' }}>[{startStr}]</span> INVOKING: <span style={{ color: '#fff' }}>{cmd}</span>
                             </div>
-                          </td>
-                        </tr>
-                        {(t.message || t.error_detail) && (
-                          <tr style={{ backgroundColor: 'rgba(0,0,0,0.02)' }}>
-                            <td colSpan={7} style={{ padding: '0.5rem 1rem 1rem 3rem', fontSize: '0.8rem', borderTop: 'none' }}>
-                              <details open>
-                                <summary style={{ fontFamily: 'var(--font-mono)', cursor: 'pointer', color: 'var(--text-dimmed)', marginBottom: '0.5rem' }}>
-                                  View execution details & verifier logs
-                                </summary>
-                                <div style={{ border: '1px solid var(--border-color)', padding: '1rem', backgroundColor: 'var(--card-bg)', borderRadius: '4px' }}>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                                    <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-dimmed)', fontSize: '0.75rem' }}>
-                                      ◆ TERMINAL CONSOLE / AGENT TRANSCRIPT ◆
-                                    </span>
-                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                      {t.status !== 'passed' && (
-                                        <button
-                                          className="btn"
-                                          style={{ borderColor: 'var(--green-color)', color: 'var(--green-color)', fontSize: '0.7rem', padding: '0.2rem 0.6rem', height: 'auto', lineHeight: '1' }}
-                                          onClick={() => handleOverrideStatus(t.id, 'passed')}
-                                        >
-                                          ✓ FORCE PASS
-                                        </button>
-                                      )}
-                                      {t.status !== 'failed' && (
-                                        <button
-                                          className="btn"
-                                          style={{ borderColor: 'var(--red-color)', color: 'var(--red-color)', fontSize: '0.7rem', padding: '0.2rem 0.6rem', height: 'auto', lineHeight: '1' }}
-                                          onClick={() => handleOverrideStatus(t.id, 'failed')}
-                                        >
-                                          ✗ FORCE FAIL
-                                        </button>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <pre style={{
-                                    whiteSpace: 'pre-wrap',
-                                    wordBreak: 'break-all',
-                                    fontFamily: 'var(--font-mono)',
-                                    padding: '1rem',
-                                    border: '1px solid var(--border-color)',
-                                    backgroundColor: 'var(--card-bg)',
-                                    maxHeight: '350px',
-                                    overflowY: 'auto',
-                                    borderRadius: '4px',
-                                    fontSize: '0.8rem',
-                                    lineHeight: '1.4'
-                                  }}>
-                                    {t.message && `[Verifier Output]:\n${t.message}\n\n`}
-                                    {t.error_detail && `[Run Log / Messages]:\n${t.error_detail}`}
-                                  </pre>
-                                </div>
-                              </details>
+                            
+                            {/* Output */}
+                            {(t.message || t.error_detail) ? (
+                              <pre style={{
+                                margin: '0.5rem 0',
+                                padding: '0.75rem',
+                                backgroundColor: '#181818',
+                                border: '1px solid #222',
+                                color: '#bbb',
+                                fontSize: '0.8rem',
+                                whiteSpace: 'pre-wrap',
+                                wordBreak: 'break-all'
+                              }}>
+                                {t.message && `[Verifier Output]:\n${t.message}\n\n`}
+                                {t.error_detail && `[Run Log / Messages]:\n${t.error_detail}`}
+                              </pre>
+                            ) : (
+                              <div style={{ color: '#555', fontStyle: 'italic', fontSize: '0.8rem', margin: '0.5rem 0 0.5rem 1rem' }}>
+                                No stdout or transcript logs recorded.
+                              </div>
+                            )}
+                            
+                            {/* Status */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem' }}>
+                              <div style={{ color: outcomeColor, fontWeight: 'bold' }}>
+                                [{endStr}] STATUS: {t.status.toUpperCase()} ({durationStr} {t.agent_total_tokens ? `| ${t.agent_total_tokens.toLocaleString()} tokens` : ''})
+                              </div>
+                              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                {t.status !== 'passed' && (
+                                  <button
+                                    className="btn"
+                                    style={{ borderColor: 'var(--green-color)', color: 'var(--green-color)', fontSize: '0.65rem', padding: '0.1rem 0.4rem', height: 'auto', lineHeight: '1' }}
+                                    onClick={() => handleOverrideStatus(t.id, 'passed')}
+                                  >
+                                    ✓ FORCE PASS
+                                  </button>
+                                )}
+                                {t.status !== 'failed' && (
+                                  <button
+                                    className="btn"
+                                    style={{ borderColor: 'var(--red-color)', color: 'var(--red-color)', fontSize: '0.65rem', padding: '0.1rem 0.4rem', height: 'auto', lineHeight: '1' }}
+                                    onClick={() => handleOverrideStatus(t.id, 'failed')}
+                                  >
+                                    ✗ FORCE FAIL
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="table-container">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: '60px' }}>No.</th>
+                        <th>Task Name</th>
+                        <th>Status</th>
+                        <th>Tokens</th>
+                        <th>T/s</th>
+                        <th>Time</th>
+                        <th>Result details / Error message</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedRun.task_results?.map((t: any, idx: number) => (
+                        <React.Fragment key={t.id}>
+                          <tr>
+                            <td style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-dimmed)' }}>{idx + 1}</td>
+                            <td style={{ fontWeight: 600 }}>{t.task_name}</td>
+                            <td>
+                              <span className={`badge badge-${t.status}`}>{t.status}</span>
+                            </td>
+                            <td style={{ fontFamily: 'var(--font-mono)' }}>{t.agent_total_tokens?.toLocaleString() || '-'}</td>
+                            <td style={{ fontFamily: 'var(--font-mono)' }}>{t.tokens_per_second ? t.tokens_per_second.toFixed(1) : '-'}</td>
+                            <td style={{ fontFamily: 'var(--font-mono)' }}>{t.elapsed_seconds ? `${t.elapsed_seconds.toFixed(1)}s` : '-'}</td>
+                            <td style={{ fontSize: '0.85rem' }}>
+                              <div style={{ maxWidth: '400px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {t.message || t.error_detail || '-'}
+                              </div>
                             </td>
                           </tr>
-                        )}
-                      </React.Fragment>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                          {(t.message || t.error_detail) && (
+                            <tr style={{ backgroundColor: 'rgba(0,0,0,0.02)' }}>
+                              <td colSpan={7} style={{ padding: '0.5rem 1rem 1rem 3rem', fontSize: '0.8rem', borderTop: 'none' }}>
+                                <details open>
+                                  <summary style={{ fontFamily: 'var(--font-mono)', cursor: 'pointer', color: 'var(--text-dimmed)', marginBottom: '0.5rem' }}>
+                                    View execution details & verifier logs
+                                  </summary>
+                                  <div style={{ border: '1px solid var(--border-color)', padding: '1rem', backgroundColor: 'var(--card-bg)', borderRadius: '4px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                                      <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-dimmed)', fontSize: '0.75rem' }}>
+                                        ◆ TERMINAL CONSOLE / AGENT TRANSCRIPT ◆
+                                      </span>
+                                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                        {t.status !== 'passed' && (
+                                          <button
+                                            className="btn"
+                                            style={{ borderColor: 'var(--green-color)', color: 'var(--green-color)', fontSize: '0.7rem', padding: '0.2rem 0.6rem', height: 'auto', lineHeight: '1' }}
+                                            onClick={() => handleOverrideStatus(t.id, 'passed')}
+                                          >
+                                            ✓ FORCE PASS
+                                          </button>
+                                        )}
+                                        {t.status !== 'failed' && (
+                                          <button
+                                            className="btn"
+                                            style={{ borderColor: 'var(--red-color)', color: 'var(--red-color)', fontSize: '0.7rem', padding: '0.2rem 0.6rem', height: 'auto', lineHeight: '1' }}
+                                            onClick={() => handleOverrideStatus(t.id, 'failed')}
+                                          >
+                                            ✗ FORCE FAIL
+                                          </button>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <pre style={{
+                                      whiteSpace: 'pre-wrap',
+                                      wordBreak: 'break-all',
+                                      fontFamily: 'var(--font-mono)',
+                                      padding: '1rem',
+                                      border: '1px solid var(--border-color)',
+                                      backgroundColor: 'var(--card-bg)',
+                                      maxHeight: '350px',
+                                      overflowY: 'auto',
+                                      borderRadius: '4px',
+                                      fontSize: '0.8rem',
+                                      lineHeight: '1.4'
+                                    }}>
+                                      {t.message && `[Verifier Output]:\n${t.message}\n\n`}
+                                      {t.error_detail && `[Run Log / Messages]:\n${t.error_detail}`}
+                                    </pre>
+                                  </div>
+                                </details>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
         </div>

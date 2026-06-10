@@ -31,7 +31,11 @@ def _run_to_out(run) -> RunOut:
 
 
 def _run_to_detail(run) -> RunDetailOut:
-    results = [TaskResultOut.model_validate(tr) for tr in (run.task_results or [])]
+    results = []
+    for tr in (run.task_results or []):
+        tr_out = TaskResultOut.model_validate(tr)
+        tr_out.prompt = tr.test.prompt if tr.test else ""
+        results.append(tr_out)
     d = RunOut.model_validate(run).model_dump()
     d["task_results"] = results
     d["benchmark_name"] = run.benchmark.name if run.benchmark else None

@@ -17,6 +17,7 @@ class TaskResultOut(BaseModel):
     test_id: str | None = None
     builtin_task_id: str | None = None
     task_name: str = ""
+    prompt: str | None = None
     position: int = 0
     status: str = "pending"
     message: str = ""

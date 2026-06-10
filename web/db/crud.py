@@ -27,9 +27,7 @@ from web.db.models import (
 
 async def get_benchmarks(session: AsyncSession) -> Sequence[Benchmark]:
     result = await session.execute(
-        select(Benchmark)
-        .options(selectinload(Benchmark.groups).selectinload(TestGroup.tests))
-        .order_by(Benchmark.created_at.desc())
+        select(Benchmark).options(selectinload(Benchmark.groups)).order_by(Benchmark.created_at.desc())
     )
     return result.scalars().all()
 
@@ -400,51 +398,3 @@ async def get_runs_for_compare(
         .options(selectinload(Run.task_results))
     )
     return result.scalars().all()
-
-
-async def override_task_result_status(
-    session: AsyncSession,
-    task_result_id: str,
-    new_status: TaskStatus
-) -> TaskResult | None:
-    # 1. Fetch task result
-    result = await session.execute(
-        select(TaskResult).where(TaskResult.id == task_result_id)
-    )
-    task_result = result.scalar_one_or_none()
-    if not task_result:
-        return None
-    
-    # 2. Update status and clear failure reason if passed
-    task_result.status = new_status
-    if new_status == TaskStatus.PASSED:
-        task_result.failure_reason = None
-    
-    # 3. Update the run stats
-    run_result = await session.execute(
-        select(Run).where(Run.id == task_result.run_id)
-    )
-    run = run_result.scalar_one_or_none()
-    if run:
-        # Recalculate passed_tasks and failed_tasks from all task results
-        passed_count_res = await session.execute(
-            select(func.count(TaskResult.id))
-            .where(TaskResult.run_id == run.id)
-            .where(TaskResult.status == TaskStatus.PASSED)
-        )
-        passed_count = passed_count_res.scalar() or 0
-        
-        completed_count_res = await session.execute(
-            select(func.count(TaskResult.id))
-            .where(TaskResult.run_id == run.id)
-            .where(TaskResult.status != TaskStatus.PENDING)
-            .where(TaskResult.status != TaskStatus.RUNNING)
-        )
-        completed_count = completed_count_res.scalar() or 0
-        
-        run.passed_tasks = passed_count
-        run.failed_tasks = completed_count - passed_count
-        run.completed_tasks = completed_count
-        
-    await session.flush()
-    return task_result
