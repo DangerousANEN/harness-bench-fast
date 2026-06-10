@@ -1,5 +1,8 @@
 # harness-bench
 
+> [!IMPORTANT]
+> **[РУКОВОДСТВО ПО ЗАПУСКУ И ТЕСТИРОВАНИЮ ХАРНЕССОВ](file:///F:/aProgramms/harness-bench-fast/RUN_GUIDE.md)**: Подробные инструкции по чистой установке (без GigaChat/корпоративного мусора) и тестированию агентов `hermes`, `deepagents`, `openclaw`, `opencode`, `codex`, `claudecode`, `piclaw`.
+
 ## Current Results
 
 Current benchmark results use the 298-task set (`task-set v0.7.0`). Older
@@ -34,9 +37,6 @@ files, transform CSV / JSON / JSONL / XLSX, run pytest, search across a
 project tree, write and use `MEMORY.md` per repo conventions, and chain
 all of that into multi-step pipelines.
 
-This benchmark is part of the
-[`GigaChain`](https://github.com/ai-forever/gigachain) project.
-
 Every task is **mechanically verified** — no LLM-as-judge. Verifiers use
 exact content checks where byte-for-byte output matters, plus regex
 matches, line lists, JSON parsing, importing a Python module and calling
@@ -46,24 +46,13 @@ XLSX cells, and so on.
 The benchmark exists to track how well an agent harness + model
 combination handles **realistic coding tasks** with adversarially-chosen
 edge cases (ambiguous prompts dropped; only honest, scoped-to-tool tests
-remain). It started life as `harness_bench/` inside
-[`deepagents-gigachat`](https://github.com/ai-forever/deepagents-gigachat)
-and was extracted into its own repo once it matured.
+remain) and was extracted into its own repo once it matured.
 
 ## Quick start
 
 ```bash
-# Install the bench in a fresh venv. The `[gigachat]` extra adds the
-# GigaChat client; `[openrouter]` adds the OpenAI-compatible client used
-# by `run-openrouter`.
-uv venv && uv pip install -e ".[gigachat,openrouter]"
-
-# Optional: install the public GigaChat harness profile. Exact v9/v10
-# result reproduction may require installing the matching local
-# deepagents-gigachat wheel/source instead; after installing a local
-# wheel, use `uv run --no-sync ...` so uv does not re-resolve it back
-# to the public profile.
-uv pip install -e ".[gigachat-profile]"
+# Install the bench in a fresh venv with openrouter and web panel support.
+uv venv && uv pip install -e ".[openrouter,web]"
 
 # List all 298 tasks
 uv run python -m harness_bench list
@@ -71,35 +60,9 @@ uv run python -m harness_bench list
 # Show the benchmark task-set version and revision history
 uv run python -m harness_bench version --check
 
-# Run the whole bench against GigaChat (needs GIGACHAT_USER /
-# GIGACHAT_PASSWORD in .env or env, plus GIGACHAT_BASE_URL pointing at
-# the production gateway):
-uv run python -m harness_bench run --concurrency 5
-
-# Run against any OpenAI-compatible OpenRouter model (needs
-# OPENROUTER_API_KEY):
+# Run against any OpenAI-compatible OpenRouter model (needs OPENROUTER_API_KEY):
 uv run python -m harness_bench run-openrouter \
     --model deepseek/deepseek-v4-flash --concurrency 5
-
-# Internal OpenAI-compatible gateways can use password auth instead of a
-# static API key. The runner fetches and refreshes a bearer token without
-# printing it:
-# OPENROUTER_USE_INTERNAL_TAGME=1  # local shortcut for the ignored tagme example
-# OPENROUTER_BASE_URL=https://gateway.example/x/ai/llm/v1
-# OPENROUTER_AUTH_URL=https://gateway.example/auth/realms/.../token
-# OPENROUTER_AUTH_USERNAME=...
-# OPENROUTER_AUTH_PASSWORD=...
-# OPENROUTER_AUTH_CLIENT_ID=api
-# OPENROUTER_AUTH_VERIFY_TLS=false  # only for private gateways that need curl -k
-uv run python -m harness_bench run-openrouter \
-    --model gpt-4.1-nano --concurrency 5
-# run-openrouter retries transient HTTP/timeout/transport model errors up to
-# 5 total attempts per task before counting them as task failures. Override
-# with --transient-attempts if needed.
-
-# Run stock deepagents + GigaChat while bypassing the GigaChat harness
-# profile even if deepagents-gigachat is installed.
-uv run python -m harness_bench run-pure --concurrency 5
 
 # Drive an external CLI agent (Claude Code, etc.). Example with
 # Anthropic's free-code CLI:
@@ -249,12 +212,12 @@ changes do not need a task-set bump.
 | --- | --- |
 | `core.py` | `Task` (dataclass) and `VerifyResult`. Supports `setup_callback` / `gold_callback` hooks for binary fixtures (xlsx, sqlite, zip, tar). |
 | `verifiers.py` | Helpers for building verifiers: `file_exists`, `file_contains`, `file_lines_equal`, `file_matches_regex`, `json_file_has`, `python_runs`, `python_callable_returns`, `pytest_passes`, `xlsx_cell_equals`, `sqlite_query_returns`, `all_of`, etc. |
-| `runner.py` | Runs a task in an isolated `tempfile.TemporaryDirectory` with `LocalShellBackend(virtual_mode=True)` rooted at that directory. Drives GigaChat through `langchain-gigachat`. Optional `--concurrency` via a thread pool. Auto-loads the `deepagents-gigachat` harness profile if installed. |
+| `runner.py` | Runs a task in an isolated `tempfile.TemporaryDirectory` with `LocalShellBackend(virtual_mode=True)` rooted at that directory. Optional `--concurrency` via a thread pool. |
 | `runner_cli.py` | Alternative driver that shells out to an external CLI agent (`free-code`, `claude`, etc.). Default: `free-code -p --model haiku --dangerously-skip-permissions`. Detects Claude-Code-style CLIs and auto-injects workspace `AGENTS.md` via `--append-system-prompt`. |
-| `runner_openrouter.py` | Runner for any OpenAI-compatible OpenRouter model via `langchain-openai`. Does **not** apply any harness profile — measures raw `deepagents` defaults against the chosen model. |
-| `runner_pure.py` | Stock `deepagents` + GigaChat runner that bypasses `deepagents-gigachat` profile lookup even when that package is installed. Useful as a no-profile baseline, not a direct raw-API baseline. |
+| `runner_openrouter.py` | Runner for any OpenAI-compatible OpenRouter model via `langchain-openai`. Measures raw `deepagents` defaults against the chosen model. |
+| `runner_pure.py` | Stock deepagents runner. |
 | `harbor_export.py` | Additive Harbor export layer. Generates local Harbor task directories from the same Python task registry; does not replace the no-Docker local runners. |
-| `__main__.py` | CLI: `list`, `version`, `run`, `run-pure`, `run-cli`, `run-openrouter`, `verify-gold`, `verify-task`, `apply-gold`, `export-harbor`. |
+| `__main__.py` | CLI: `list`, `version`, `run-cli`, `run-openrouter`, `verify-gold`, `verify-task`, `apply-gold`, `export-harbor`. |
 
 Each task is independent: the runner creates a fresh
 `tempfile.TemporaryDirectory`, writes `setup_files` (and optionally
