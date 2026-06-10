@@ -103,3 +103,10 @@ class CompareTaskRow(BaseModel):
 class CompareSummary(BaseModel):
     runs: list[RunOut]
     per_task: list[CompareTaskRow]
+
+
+# ---- Override ----
+
+
+class TaskOverrideRequest(BaseModel):
+    status: str

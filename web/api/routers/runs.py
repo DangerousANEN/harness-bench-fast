@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from web.api.deps import get_db
 from web.api.ws import ws_manager
 from web.db import crud
-from web.db.models import RunStatus
+from web.db.models import RunStatus, TaskStatus
 from web.engine.orchestrator import orchestrator
 from web.schemas.runs import (
     CompareRequest,
@@ -20,6 +20,7 @@ from web.schemas.runs import (
     RunDetailOut,
     RunOut,
     TaskResultOut,
+    TaskOverrideRequest,
 )
 
 router = APIRouter(prefix="/api/runs", tags=["runs"])
@@ -160,6 +161,81 @@ async def compare_runs(body: CompareRequest, db: AsyncSession = Depends(get_db))
 
 
 # ---- WebSocket ----
+
+
+@router.get("/compare")
+async def compare_runs_get(
+    run_id_1: str,
+    run_id_2: str,
+    db: AsyncSession = Depends(get_db),
+):
+    runs = await crud.get_runs_for_compare(db, [run_id_1, run_id_2])
+    if len(runs) < 2:
+        raise HTTPException(404, "One or both runs not found")
+
+    run_1, run_2 = (runs[0], runs[1]) if runs[0].id == run_id_1 else (runs[1], runs[0])
+
+    tasks_1 = {tr.task_name: tr for tr in run_1.task_results}
+    tasks_2 = {tr.task_name: tr for tr in run_2.task_results}
+
+    all_names = sorted(list(set(tasks_1.keys()) | set(tasks_2.keys())))
+
+    tasks_out = []
+    for name in all_names:
+        r1 = tasks_1.get(name)
+        r2 = tasks_2.get(name)
+        tasks_out.append({
+            "task_name": name,
+            "status_1": r1.status.value if r1 else None,
+            "status_2": r2.status.value if r2 else None,
+            "tokens_1": r1.agent_total_tokens if r1 else None,
+            "tokens_2": r2.agent_total_tokens if r2 else None,
+        })
+
+    return {
+        "run_1": _run_to_out(run_1),
+        "run_2": _run_to_out(run_2),
+        "tasks": tasks_out
+    }
+
+
+@router.post("/tasks/{task_result_id}/override-status")
+async def override_task_status(
+    task_result_id: str,
+    body: TaskOverrideRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        new_status = TaskStatus(body.status.lower())
+    except ValueError:
+        raise HTTPException(400, f"Invalid status: {body.status}. Must be one of {[s.value for s in TaskStatus]}")
+
+    updated_tr = await crud.override_task_result_status(db, task_result_id, new_status)
+    if updated_tr is None:
+        raise HTTPException(404, "Task result not found")
+
+    await db.commit()
+
+    run = await crud.get_run(db, updated_tr.run_id)
+    if run:
+        await ws_manager.broadcast(run.id, {
+            "type": "task_completed",
+            "task_result": {
+                "task_name": updated_tr.task_name,
+                "status": updated_tr.status.value,
+                "tokens": updated_tr.agent_total_tokens,
+                "elapsed": updated_tr.elapsed_seconds,
+            },
+            "run_stats": {
+                "completed_tasks": run.completed_tasks,
+                "passed_tasks": run.passed_tasks,
+                "failed_tasks": run.failed_tasks,
+                "total_tokens": run.total_tokens,
+                "tokens_per_second": run.avg_tokens_per_second,
+            }
+        })
+
+    return {"status": "ok", "task_status": updated_tr.status}
 
 
 @router.websocket("/ws/{run_id}")

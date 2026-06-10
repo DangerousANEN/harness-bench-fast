@@ -431,6 +431,7 @@ def run_task(
                 elapsed_seconds=time.monotonic() - started,
                 stats=stats.merged(invocation_result),
                 workspace=workspace_path if keep_workspace else None,
+                invocation_result=invocation_result,
             )
         finally:
             if workspace_keepalive is not None:

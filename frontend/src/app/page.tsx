@@ -179,7 +179,7 @@ export default function Home() {
 
       ws.onmessage = (event) => {
         const msg = JSON.parse(event.data);
-        if (msg.type === 'task_update' || msg.type === 'run_completed') {
+        if (msg.type === 'task_update' || msg.type === 'task_completed' || msg.type === 'run_completed') {
           // Refresh details
           fetchRunDetails(selectedRunId);
           fetchRuns();
@@ -281,6 +281,28 @@ export default function Home() {
       }
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  // Override Task Status
+  const handleOverrideStatus = async (taskResultId: string, status: string) => {
+    if (!confirm(`Force status to ${status.toUpperCase()} for this task result?`)) return;
+    try {
+      const res = await fetch(`${getApiBase()}/api/runs/tasks/${taskResultId}/override-status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      });
+      if (res.ok) {
+        if (selectedRunId) fetchRunDetails(selectedRunId);
+        fetchRuns();
+      } else {
+        const errData = await res.json();
+        alert(`Failed to override status: ${errData.detail || 'Unknown error'}`);
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error overriding status');
     }
   };
 
@@ -850,15 +872,54 @@ export default function Home() {
                         </tr>
                         {(t.message || t.error_detail) && (
                           <tr style={{ backgroundColor: 'rgba(0,0,0,0.02)' }}>
-                            <td colSpan={7} style={{ padding: '0.5rem 1rem 0.75rem 3rem', fontSize: '0.8rem', borderTop: 'none' }}>
-                              <details>
-                                <summary style={{ fontFamily: 'var(--font-mono)', cursor: 'pointer', color: 'var(--text-dimmed)' }}>
-                                  View execution traceback / verifier details
+                            <td colSpan={7} style={{ padding: '0.5rem 1rem 1rem 3rem', fontSize: '0.8rem', borderTop: 'none' }}>
+                              <details open>
+                                <summary style={{ fontFamily: 'var(--font-mono)', cursor: 'pointer', color: 'var(--text-dimmed)', marginBottom: '0.5rem' }}>
+                                  View execution details & verifier logs
                                 </summary>
-                                <pre style={{ whiteSpace: 'pre-wrap', marginTop: '0.5rem', fontFamily: 'var(--font-mono)', padding: '0.75rem', border: '1px solid var(--border-color)', backgroundColor: 'var(--card-bg)' }}>
-                                  {t.message && `Verifier message:\n${t.message}\n\n`}
-                                  {t.error_detail && `Execution Error:\n${t.error_detail}`}
-                                </pre>
+                                <div style={{ border: '1px solid var(--border-color)', padding: '1rem', backgroundColor: 'var(--card-bg)', borderRadius: '4px' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                                    <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-dimmed)', fontSize: '0.75rem' }}>
+                                      ◆ TERMINAL CONSOLE / AGENT TRANSCRIPT ◆
+                                    </span>
+                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                      {t.status !== 'passed' && (
+                                        <button
+                                          className="btn"
+                                          style={{ borderColor: 'var(--green-color)', color: 'var(--green-color)', fontSize: '0.7rem', padding: '0.2rem 0.6rem', height: 'auto', lineHeight: '1' }}
+                                          onClick={() => handleOverrideStatus(t.id, 'passed')}
+                                        >
+                                          ✓ FORCE PASS
+                                        </button>
+                                      )}
+                                      {t.status !== 'failed' && (
+                                        <button
+                                          className="btn"
+                                          style={{ borderColor: 'var(--red-color)', color: 'var(--red-color)', fontSize: '0.7rem', padding: '0.2rem 0.6rem', height: 'auto', lineHeight: '1' }}
+                                          onClick={() => handleOverrideStatus(t.id, 'failed')}
+                                        >
+                                          ✗ FORCE FAIL
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <pre style={{
+                                    whiteSpace: 'pre-wrap',
+                                    wordBreak: 'break-all',
+                                    fontFamily: 'var(--font-mono)',
+                                    padding: '1rem',
+                                    border: '1px solid var(--border-color)',
+                                    backgroundColor: 'var(--card-bg)',
+                                    maxHeight: '350px',
+                                    overflowY: 'auto',
+                                    borderRadius: '4px',
+                                    fontSize: '0.8rem',
+                                    lineHeight: '1.4'
+                                  }}>
+                                    {t.message && `[Verifier Output]:\n${t.message}\n\n`}
+                                    {t.error_detail && `[Run Log / Messages]:\n${t.error_detail}`}
+                                  </pre>
+                                </div>
                               </details>
                             </td>
                           </tr>

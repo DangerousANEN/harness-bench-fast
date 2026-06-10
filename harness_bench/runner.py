@@ -73,6 +73,7 @@ class TaskRun:
     agent_input_tokens: int | None = None
     agent_output_tokens: int | None = None
     agent_total_tokens: int | None = None
+    agent_transcript: str | None = None
 
 
 def _load_env_from_dotenv() -> None:
@@ -264,6 +265,37 @@ def invoke_agent_with_stats(agent: Any, payload: dict[str, Any], stats: AgentRun
         return agent.invoke(payload)
 
 
+def format_messages_transcript(invocation_result: Any) -> str | None:
+    if not isinstance(invocation_result, dict):
+        return None
+    messages = invocation_result.get("messages")
+    if not isinstance(messages, list):
+        return None
+
+    import json
+    lines = []
+    for i, m in enumerate(messages):
+        role = getattr(m, "type", None) or getattr(m, "role", None)
+        if isinstance(m, dict):
+            role = m.get("type") or m.get("role") or "unknown"
+            content = m.get("content", "")
+            tool_calls = m.get("tool_calls", None)
+        else:
+            content = getattr(m, "content", "")
+            tool_calls = getattr(m, "tool_calls", None)
+
+        lines.append(f"[{i+1}] === {role.upper()} ===")
+        if content:
+            lines.append(str(content).strip())
+        if tool_calls:
+            try:
+                lines.append(f"Tool Calls:\n{json.dumps(tool_calls, indent=2, ensure_ascii=False)}")
+            except Exception:
+                lines.append(f"Tool Calls: {tool_calls}")
+        lines.append("")
+    return "\n".join(lines)
+
+
 def _task_run_with_agent_stats(
     *,
     task_id: str,
@@ -273,7 +305,9 @@ def _task_run_with_agent_stats(
     stats: dict[str, int] | None,
     error: str | None = None,
     workspace: Path | None = None,
+    invocation_result: Any | None = None,
 ) -> TaskRun:
+    transcript = format_messages_transcript(invocation_result)
     return TaskRun(
         task_id=task_id,
         passed=passed,
@@ -281,6 +315,7 @@ def _task_run_with_agent_stats(
         elapsed_seconds=elapsed_seconds,
         error=error,
         workspace=workspace,
+        agent_transcript=transcript,
         **(stats or {}),
     )
 
@@ -397,6 +432,7 @@ def run_task(
             elapsed_seconds=time.monotonic() - started,
             stats=stats.merged(invocation_result),
             workspace=workspace_path if keep_workspace else None,
+            invocation_result=invocation_result,
         )
     finally:
         if workspace_keepalive is not None:

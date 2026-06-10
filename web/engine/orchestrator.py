@@ -33,6 +33,135 @@ _TRANSIENT_ERROR_PATTERN = re.compile(
 )
 
 
+def parse_tokens_from_text(text: str) -> dict[str, int]:
+    import re
+    # Match various formats
+    prompt_patterns = [
+        r"(?:prompt|input)[_-]tokens\s*[:=]\s*(\d+)",
+        r"(?:prompt|input)\s+tokens\s*[:=]?\s*(\d+)",
+        r"(\d+)\s*(?:prompt|input)\s+tokens",
+        r"(?:prompt|input)\s*[:=]\s*(\d+)\s*tokens",
+    ]
+    completion_patterns = [
+        r"(?:completion|output)[_-]tokens\s*[:=]\s*(\d+)",
+        r"(?:completion|output)\s+tokens\s*[:=]?\s*(\d+)",
+        r"(\d+)\s*(?:completion|output)\s+tokens",
+        r"(?:completion|output)\s*[:=]\s*(\d+)\s*tokens",
+    ]
+    total_patterns = [
+        r"total[_-]tokens\s*[:=]\s*(\d+)",
+        r"total\s+tokens\s*[:=]?\s*(\d+)",
+        r"(\d+)\s*total\s+tokens",
+        r"total\s*[:=]\s*(\d+)\s*tokens",
+    ]
+    step_patterns = [
+        r"steps?\s*[:=]\s*(\d+)",
+        r"(\d+)\s*steps?",
+    ]
+    tool_patterns = [
+        r"tool[_-]calls?\s*[:=]\s*(\d+)",
+        r"(\d+)\s*tool[_-]calls?",
+    ]
+
+    prompt = None
+    completion = None
+    total = None
+    steps = None
+    tools = None
+
+    for p in prompt_patterns:
+        m = re.search(p, text, re.IGNORECASE)
+        if m:
+            prompt = int(m.group(1))
+            break
+    for p in completion_patterns:
+        m = re.search(p, text, re.IGNORECASE)
+        if m:
+            completion = int(m.group(1))
+            break
+    for p in total_patterns:
+        m = re.search(p, text, re.IGNORECASE)
+        if m:
+            total = int(m.group(1))
+            break
+    for p in step_patterns:
+        m = re.search(p, text, re.IGNORECASE)
+        if m:
+            steps = int(m.group(1))
+            break
+    for p in tool_patterns:
+        m = re.search(p, text, re.IGNORECASE)
+        if m:
+            tools = int(m.group(1))
+            break
+
+    if total is None and (prompt is not None or completion is not None):
+        total = (prompt or 0) + (completion or 0)
+
+    res = {}
+    if prompt is not None:
+        res["agent_input_tokens"] = prompt
+    if completion is not None:
+        res["agent_output_tokens"] = completion
+    if total is not None:
+        res["agent_total_tokens"] = total
+    if steps is not None:
+        res["agent_steps"] = steps
+    if tools is not None:
+        res["agent_tool_calls"] = tools
+    return res
+
+
+def get_hermes_tokens_for_prompt(prompt: str, start_time: float, end_time: float) -> dict[str, int]:
+    import os
+    import sqlite3
+    db_path = os.path.expanduser("~/.hermes/state.db")
+    if not os.path.exists(db_path):
+        return {}
+    try:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # 1. Search by message content matching the prompt (safest/robust for concurrency)
+        prompt_sub = prompt.strip()[:100]
+        cursor.execute("""
+            SELECT s.input_tokens, s.output_tokens, s.tool_call_count, s.message_count
+            FROM sessions s
+            JOIN messages m ON m.session_id = s.id
+            WHERE m.role IN ('user', 'human') AND m.content LIKE ?
+            ORDER BY s.started_at DESC LIMIT 1
+        """, (f"%{prompt_sub}%",))
+        row = cursor.fetchone()
+        if row:
+            return {
+                "agent_input_tokens": row[0],
+                "agent_output_tokens": row[1],
+                "agent_total_tokens": (row[0] or 0) + (row[1] or 0),
+                "agent_tool_calls": row[2],
+                "agent_steps": row[3],
+            }
+        
+        # 2. Fallback: search for a session that started during execution timeframe
+        cursor.execute("""
+            SELECT input_tokens, output_tokens, tool_call_count, message_count
+            FROM sessions
+            WHERE started_at >= ? AND started_at <= ?
+            ORDER BY started_at DESC LIMIT 1
+        """, (start_time - 10, end_time + 10))
+        row = cursor.fetchone()
+        if row:
+            return {
+                "agent_input_tokens": row[0],
+                "agent_output_tokens": row[1],
+                "agent_total_tokens": (row[0] or 0) + (row[1] or 0),
+                "agent_tool_calls": row[2],
+                "agent_steps": row[3],
+            }
+    except Exception as e:
+        logger.warning(f"Failed to query hermes database for stats: {e}")
+    return {}
+
+
 class BenchmarkOrchestrator:
     """Manages background benchmark runs, reporting progress via WebSocket."""
 
@@ -194,12 +323,22 @@ class BenchmarkOrchestrator:
                 elapsed = getattr(task_run, "elapsed_seconds", 0.0)
                 tps = task_tokens / elapsed if elapsed > 0 and task_tokens else None
 
+                error_detail = getattr(task_run, "error", None) or ""
+                transcript = getattr(task_run, "agent_transcript", None) or ""
+                if transcript:
+                    if error_detail:
+                        combined_detail = f"Execution Logs:\n{error_detail}\n\n=== AGENT TRANSCRIPT ===\n{transcript}"
+                    else:
+                        combined_detail = transcript
+                else:
+                    combined_detail = error_detail or None
+
                 async with async_session() as session:
                     await crud.update_task_result(
                         session, tr.id,
                         status=status,
                         message=getattr(task_run, "message", ""),
-                        error_detail=getattr(task_run, "error", None),
+                        error_detail=combined_detail,
                         elapsed_seconds=elapsed,
                         agent_steps=getattr(task_run, "agent_steps", None),
                         agent_tool_calls=getattr(task_run, "agent_tool_calls", None),
@@ -325,6 +464,7 @@ class BenchmarkOrchestrator:
     async def _run_cli_task(self, task, run: Run):
         """Run a task via CLI runner."""
         import shlex
+        import os
         from tempfile import TemporaryDirectory
         from harness_bench.runner import TaskRun
 
@@ -356,14 +496,29 @@ class BenchmarkOrchestrator:
                 )
 
             elapsed = time.time() - start
+            end = time.time()
+
+            # Query stats from Hermes DB or fallback to regex
+            stats = {}
+            if os.path.exists(os.path.expanduser("~/.hermes/state.db")):
+                stats = get_hermes_tokens_for_prompt(task.prompt, start, end)
+            
+            if not stats or "agent_total_tokens" not in stats:
+                stats = parse_tokens_from_text(result.stdout + "\n" + result.stderr)
 
             # Verify
             vr = task.verify(workspace)
+            
+            # Format clean log
+            console_log = f"--- STDOUT ---\n{result.stdout}\n--- STDERR ---\n{result.stderr}"
+            
             return TaskRun(
                 task_id=task.id,
                 passed=vr.passed,
                 message=vr.message,
                 elapsed_seconds=elapsed,
+                error=console_log,
+                **stats
             )
 
     async def _run_openrouter_task(self, task, run: Run):
