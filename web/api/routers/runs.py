@@ -31,10 +31,15 @@ def _run_to_out(run) -> RunOut:
 
 
 def _run_to_detail(run) -> RunDetailOut:
+    from sqlalchemy import inspect
     results = []
     for tr in (run.task_results or []):
         tr_out = TaskResultOut.model_validate(tr)
-        tr_out.prompt = tr.test.prompt if tr.test else ""
+        tr_insp = inspect(tr)
+        if tr_insp and "test" not in tr_insp.unloaded and tr.test:
+            tr_out.prompt = tr.test.prompt
+        else:
+            tr_out.prompt = ""
         results.append(tr_out)
     d = RunOut.model_validate(run).model_dump()
     d["task_results"] = results
@@ -242,7 +247,7 @@ async def override_task_status(
     return {"status": "ok", "task_status": updated_tr.status}
 
 
-@router.websocket("/ws/{run_id}")
+@router.websocket("/{run_id}/ws")
 async def ws_run_progress(websocket: WebSocket, run_id: str):
     await ws_manager.connect(run_id, websocket)
     try:

@@ -258,7 +258,7 @@ async def get_run(session: AsyncSession, run_id: str) -> Run | None:
         select(Run)
         .where(Run.id == run_id)
         .options(
-            selectinload(Run.task_results),
+            selectinload(Run.task_results).selectinload(TaskResult.test),
             selectinload(Run.benchmark),
         )
     )
