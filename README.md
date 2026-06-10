@@ -169,6 +169,44 @@ uv run python -m harness_bench apply-gold \
 
 `.env` at the repo root is auto-loaded by every runner.
 
+## Web Panel
+
+The benchmark includes a modern, premium Web Panel for managing your suites, runs, and tasks. Features:
+- **Run History**: View all current and historical runs, their detailed progress, and status.
+- **Real-time Streaming**: Watch active run progress via WebSocket with estimated remaining time.
+- **Run Comparison**: Compare two runs side-by-side with per-task outcome diffs and token usage differentials.
+- **Benchmark Suite Editor**: Create custom benchmarks, group tests, and manage task prompts, setups, and verifiers.
+- **Built-in Suite Import**: Easily import all 298 built-in tasks into any benchmark suite.
+
+### How to Run Locally
+
+1. **Install Web dependencies**:
+   ```bash
+   uv pip install -e ".[web]"
+   ```
+
+2. **Build and export the Frontend (optional, for FastAPI packaging)**:
+   ```bash
+   cd frontend
+   npm install
+   npm run build
+   cd ..
+   ```
+
+3. **Start the FastAPI server**:
+   ```bash
+   uv run uvicorn web.main:app --host 127.0.0.1 --port 8765 --reload
+   ```
+   Open `http://localhost:8765` in your browser. If you didn't build the frontend static files, you can run the Next.js dev server separately at `http://localhost:3000` via `npm run dev` in the `frontend` folder.
+
+### Running with Docker Compose
+
+To build and run the entire stack (FastAPI backend + Next.js frontend + SQLite database) in one command:
+```bash
+docker-compose up --build
+```
+The panel will be accessible at `http://localhost:8765`.
+
 ## What's inside
 
 ### Tasks (298 total, task-set v0.7.0)
