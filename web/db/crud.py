@@ -27,7 +27,9 @@ from web.db.models import (
 
 async def get_benchmarks(session: AsyncSession) -> Sequence[Benchmark]:
     result = await session.execute(
-        select(Benchmark).options(selectinload(Benchmark.groups)).order_by(Benchmark.created_at.desc())
+        select(Benchmark)
+        .options(selectinload(Benchmark.groups).selectinload(TestGroup.tests))
+        .order_by(Benchmark.created_at.desc())
     )
     return result.scalars().all()
 

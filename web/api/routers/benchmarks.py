@@ -32,13 +32,24 @@ router = APIRouter(tags=["benchmarks"])
 
 
 def _bm_to_out(bm) -> BenchmarkOut:
-    groups = bm.groups if hasattr(bm, "groups") and bm.groups else []
+    from sqlalchemy import inspect
+    insp = inspect(bm)
+    groups = []
+    if insp and "groups" not in insp.unloaded:
+        groups = bm.groups
+
+    total_tests = 0
+    for g in groups:
+        g_insp = inspect(g)
+        if g_insp and "tests" not in g_insp.unloaded:
+            total_tests += len(g.tests)
+
     return BenchmarkOut(
         id=bm.id,
         name=bm.name,
         description=bm.description,
         group_count=len(groups),
-        total_tests=sum(len(g.tests) for g in groups if hasattr(g, "tests") and g.tests),
+        total_tests=total_tests,
         created_at=bm.created_at,
         updated_at=bm.updated_at,
     )
