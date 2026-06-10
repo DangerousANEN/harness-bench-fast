@@ -33,9 +33,62 @@ async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit
 
 
 async def init_db() -> None:
-    """Create all tables (for development; use Alembic in production)."""
+    """Create all tables and seed with the built-in 298 tasks benchmark if empty."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+    from web.db import crud
+    from web.db.models import TestSource
+    from web.api.routers.benchmarks import _task_group_name, _verifier_type_name
+
+    async with async_session() as session:
+        bms = await crud.get_benchmarks(session)
+        if not bms:
+            print("Seeding database with default 298-task built-in benchmark...")
+            try:
+                from harness_bench.tasks import ALL_TASKS
+                
+                bm = await crud.create_benchmark(
+                    session,
+                    name="Built-in Harness Bench",
+                    description="298-task agent benchmark (file ops, code edits, pipelines, memory, agentic tasks)"
+                )
+
+                task_groups = {}
+                for task in ALL_TASKS:
+                    group_name = _task_group_name(task)
+                    task_groups.setdefault(group_name, []).append(task)
+
+                for group_name, tasks in task_groups.items():
+                    group = await crud.create_group(
+                        session,
+                        benchmark_id=bm.id,
+                        name=group_name,
+                        description=f"{len(tasks)} built-in tasks",
+                    )
+                    for task in tasks:
+                        tags = list(task.tags) if task.tags else []
+                        setup = {k: v for k, v in (task.setup_files or {}).items() if isinstance(v, str)}
+                        gold = {k: v for k, v in (task.gold_files or {}).items() if isinstance(v, str)}
+
+                        await crud.create_test(
+                            session,
+                            group_id=group.id,
+                            name=task.name,
+                            prompt=task.prompt,
+                            tags=tags,
+                            setup_files=setup,
+                            gold_files=gold,
+                            verifier_type=_verifier_type_name(task),
+                            verifier_config={},
+                            source=TestSource.BUILTIN,
+                            builtin_task_id=task.id,
+                        )
+                await session.commit()
+                print("Successfully seeded 298 built-in tasks!")
+            except Exception as e:
+                print(f"Failed to seed default benchmark: {e}")
+                await session.rollback()
 
 
 async def close_db() -> None:
