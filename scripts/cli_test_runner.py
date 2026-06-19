@@ -68,7 +68,7 @@ async def list_suites():
         print()
 
 
-async def create_suite(name: str, suite_type: str):
+async def create_suite(name: str, suite_type: str, task_filter: str | None = None):
     """Create a new suite and import tasks."""
     async with async_session() as session:
         # Resolve type
@@ -81,7 +81,7 @@ async def create_suite(name: str, suite_type: str):
         print(f"Created suite '{name}' with ID: {bm.id}")
 
         if bt == BenchmarkType.MICROBENCH:
-            print("Importing 16 MicroBench tasks...")
+            print("Importing MicroBench tasks...")
             from web.api.routers.benchmarks import _MICROBENCH_GROUPS
             try:
                 from microbench12.tasks import list_task_ids, load_task, load_prompt
@@ -93,7 +93,11 @@ async def create_suite(name: str, suite_type: str):
             all_tasks = [load_task(tid) for tid in list_task_ids()]
             task_map = {t.id: t for t in all_tasks}
 
+            slugs_filter = [task_filter] if task_filter else None
+
             for group_name, slugs in _MICROBENCH_GROUPS.items():
+                if slugs_filter:
+                    slugs = [s for s in slugs if s in slugs_filter]
                 matching = [task_map[s] for s in slugs if s in task_map]
                 if not matching:
                     continue
@@ -130,7 +134,7 @@ async def create_suite(name: str, suite_type: str):
             print("Successfully imported MicroBench tasks!")
 
         else:
-            print("Importing 298 built-in Harness Bench tasks...")
+            print("Importing built-in Harness Bench tasks...")
             from harness_bench.tasks import ALL_TASKS
             from web.api.routers.benchmarks import _task_group_name, _verifier_type_name
 
@@ -140,6 +144,11 @@ async def create_suite(name: str, suite_type: str):
                 task_groups.setdefault(group_name, []).append(task)
 
             for group_name, tasks in task_groups.items():
+                if task_filter:
+                    tasks = [t for t in tasks if t.id == task_filter or t.name == task_filter]
+                if not tasks:
+                    continue
+
                 group = await crud.create_group(
                     session,
                     benchmark_id=bm.id,
@@ -253,6 +262,7 @@ async def main():
     parser.add_argument("--list", action="store_true", help="List all benchmark suites")
     parser.add_argument("--create-suite", help="Name of new suite to create")
     parser.add_argument("--type", choices=["harness", "microbench"], default="microbench", help="Type of suite to create")
+    parser.add_argument("--task", help="Optional: import only a specific task ID")
     parser.add_argument("--run", help="Suite ID to run")
     parser.add_argument("--harness", choices=["cli", "microbench_cli", "openrouter", "deepagents", "pure"], default="microbench_cli", help="Harness runner type")
     parser.add_argument("--model", default="openai/gpt-4o-mini", help="Model name / override")
@@ -268,7 +278,7 @@ async def main():
         if args.list:
             await list_suites()
         elif args.create_suite:
-            await create_suite(args.create_suite, args.type)
+            await create_suite(args.create_suite, args.type, args.task)
         elif args.run:
             # Default commands if not specified
             cmd = args.command
