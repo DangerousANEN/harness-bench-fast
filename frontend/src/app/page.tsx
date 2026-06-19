@@ -718,6 +718,53 @@ export default function Home() {
                 />
               </div>
 
+              {runHarnessType === 'microbench_cli' && (
+                <div className="form-group">
+                  <label className="form-label">Harness Preset Template</label>
+                  <select
+                    className="form-select"
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === 'hermes_host') {
+                        setRunCliCommand('hermes chat -q');
+                        setRunEnvVarsText('{\n  "OPENAI_API_KEY": "your-key-here",\n  "OPENAI_BASE_URL": "http://localhost:8080/v1"\n}');
+                      } else if (val === 'hermes_docker') {
+                        setRunCliCommand('docker run --rm -e OPENAI_API_KEY -e OPENAI_BASE_URL -v {workspace}:/workspace -w /workspace mb12-hermes-isolated chat -q');
+                        setRunEnvVarsText('{\n  "OPENAI_API_KEY": "your-key-here",\n  "OPENAI_BASE_URL": "http://localhost:8080/v1"\n}');
+                      } else if (val === 'opencode_host') {
+                        setRunCliCommand('opencode run --pure --dir . --dangerously-skip-permissions');
+                        setRunEnvVarsText('{\n  "OPENAI_API_KEY": "your-key-here",\n  "OPENAI_BASE_URL": "http://localhost:8080/v1"\n}');
+                      } else if (val === 'opencode_docker') {
+                        setRunCliCommand('docker run --rm -e OPENAI_API_KEY -e OPENAI_BASE_URL -v {workspace}:/workspace -w /workspace mb12-opencode-isolated run --pure --dir /workspace --dangerously-skip-permissions');
+                        setRunEnvVarsText('{\n  "OPENAI_API_KEY": "your-key-here",\n  "OPENAI_BASE_URL": "http://localhost:8080/v1"\n}');
+                      } else if (val === 'pi_host') {
+                        setRunCliCommand('pi --tools read,bash,edit,write,grep,find,ls --print');
+                        setRunEnvVarsText('{\n  "OPENAI_API_KEY": "your-key-here",\n  "OPENAI_BASE_URL": "http://localhost:8080/v1"\n}');
+                      } else if (val === 'pi_docker') {
+                        setRunCliCommand('docker run --rm -e OPENAI_API_KEY -e OPENAI_BASE_URL -v {workspace}:/workspace -w /workspace mb12-pi-isolated --tools read,bash,edit,write,grep,find,ls --print');
+                        setRunEnvVarsText('{\n  "OPENAI_API_KEY": "your-key-here",\n  "OPENAI_BASE_URL": "http://localhost:8080/v1"\n}');
+                      } else if (val === 'openclaw_host') {
+                        setRunCliCommand('openclaw agent --local');
+                        setRunEnvVarsText('{\n  "OPENAI_API_KEY": "your-key-here",\n  "OPENAI_BASE_URL": "http://localhost:8080/v1"\n}');
+                      } else if (val === 'openclaw_docker') {
+                        setRunCliCommand('docker run --rm -e OPENAI_API_KEY -e OPENAI_BASE_URL -v {workspace}:/workspace -w /workspace mb12-openclaw-isolated agent --local');
+                        setRunEnvVarsText('{\n  "OPENAI_API_KEY": "your-key-here",\n  "OPENAI_BASE_URL": "http://localhost:8080/v1"\n}');
+                      }
+                    }}
+                  >
+                    <option value="">-- Choose Preset or configure custom --</option>
+                    <option value="hermes_host">Hermes (Host)</option>
+                    <option value="hermes_docker">Hermes (Docker Container)</option>
+                    <option value="opencode_host">OpenCode (Host)</option>
+                    <option value="opencode_docker">OpenCode (Docker Container)</option>
+                    <option value="pi_host">Pi (Host)</option>
+                    <option value="pi_docker">Pi (Docker Container)</option>
+                    <option value="openclaw_host">OpenClaw (Host)</option>
+                    <option value="openclaw_docker">OpenClaw (Docker Container)</option>
+                  </select>
+                </div>
+              )}
+
               {(runHarnessType === 'cli' || runHarnessType === 'microbench_cli') && (
                 <div className="form-group">
                   <label className="form-label">{runHarnessType === 'microbench_cli' ? 'Harness CLI Command' : 'CLI Command template'}</label>
