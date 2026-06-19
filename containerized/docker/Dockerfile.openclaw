@@ -1,0 +1,21 @@
+FROM debian:bookworm-slim
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        bash \
+        ca-certificates \
+        git \
+        python3 \
+        libc6 \
+        libstdc++6 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY .nvm/versions/node/v22.22.3/bin/node /usr/local/bin/node
+COPY .nvm/versions/node/v22.22.3/lib/node_modules/openclaw /opt/openclaw
+
+RUN useradd -m -u 1000 agent
+
+USER agent
+WORKDIR /workspace
+
+ENTRYPOINT ["/usr/local/bin/node", "/opt/openclaw/openclaw.mjs"]

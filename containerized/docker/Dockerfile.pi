@@ -1,0 +1,21 @@
+FROM debian:bookworm-slim
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        bash \
+        ca-certificates \
+        git \
+        python3 \
+        libc6 \
+        libstdc++6 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY .nvm/versions/node/v20.20.2/bin/node /usr/local/bin/node
+COPY .nvm/versions/node/v20.20.2/lib/node_modules/@mariozechner/pi-coding-agent /opt/pi-coding-agent
+
+RUN useradd -m -u 1000 agent
+
+USER agent
+WORKDIR /workspace
+
+ENTRYPOINT ["/usr/local/bin/node", "/opt/pi-coding-agent/dist/cli.js"]

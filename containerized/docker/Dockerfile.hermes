@@ -1,0 +1,22 @@
+FROM debian:bookworm-slim
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        bash \
+        ca-certificates \
+        git \
+        python3 \
+        libc6 \
+        libstdc++6 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY .hermes/hermes-agent /opt/hermes-agent
+
+RUN useradd -m -u 1000 agent
+
+ENV PYTHONPATH=/opt/hermes-agent:/opt/hermes-agent/venv/lib/python3.11/site-packages
+
+USER agent
+WORKDIR /workspace
+
+ENTRYPOINT ["python3", "-m", "hermes_cli.main"]
