@@ -729,10 +729,10 @@ export default function Home() {
                     onChange={(e) => {
                       const val = e.target.value;
                       if (val === 'hermes_host') {
-                        setRunCliCommand('hermes chat -q -m {model}');
+                        setRunCliCommand('hermes chat -m {model} -q');
                         setRunEnvVarsText('{\n  "OPENAI_API_KEY": "your-key-here",\n  "OPENAI_BASE_URL": "http://localhost:8080/v1"\n}');
                       } else if (val === 'hermes_docker') {
-                        setRunCliCommand('docker run --rm -e OPENAI_API_KEY -e OPENAI_BASE_URL -v {workspace}:/workspace -w /workspace mb12-hermes-isolated chat -q -m {model}');
+                        setRunCliCommand('docker run --rm -e OPENAI_API_KEY -e OPENAI_BASE_URL -v {workspace}:/workspace -w /workspace mb12-hermes-isolated chat -m {model} -q');
                         setRunEnvVarsText('{\n  "OPENAI_API_KEY": "your-key-here",\n  "OPENAI_BASE_URL": "http://localhost:8080/v1"\n}');
                       } else if (val === 'opencode_host') {
                         setRunCliCommand('opencode run --pure --dir . --model {model} --dangerously-skip-permissions');
@@ -774,7 +774,7 @@ export default function Home() {
                   <input
                     type="text"
                     className="form-input"
-                    placeholder={runHarnessType === 'microbench_cli' ? 'hermes chat -q -m {model}' : 'free-code -p --model {model}'}
+                    placeholder={runHarnessType === 'microbench_cli' ? 'hermes chat -m {model} -q' : 'free-code -p --model {model}'}
                     value={runCliCommand}
                     onChange={(e) => setRunCliCommand(e.target.value)}
                     required

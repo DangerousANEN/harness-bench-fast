@@ -266,7 +266,7 @@ async def main():
     parser.add_argument("--run", help="Suite ID to run")
     parser.add_argument("--harness", choices=["cli", "microbench_cli", "openrouter", "deepagents", "pure"], default="microbench_cli", help="Harness runner type")
     parser.add_argument("--model", default="openai/gpt-4o-mini", help="Model name / override")
-    parser.add_argument("--command", help="Harness command template (e.g. 'hermes chat -q -m {model}')")
+    parser.add_argument("--command", help="Harness command template (e.g. 'hermes chat -m {model} -q')")
     parser.add_argument("--url", help="Base URL override")
     parser.add_argument("--env", default="{}", help="Environment variables as JSON string")
 
@@ -284,7 +284,7 @@ async def main():
             cmd = args.command
             if not cmd:
                 if args.harness == "microbench_cli":
-                    cmd = "hermes chat -q -m {model}"
+                    cmd = "hermes chat -m {model} -q"
                 else:
                     cmd = "free-code -p --model {model}"
             await run_suite(args.run, args.harness, args.model, cmd, args.url, args.env)
