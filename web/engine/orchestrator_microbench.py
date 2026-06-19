@@ -93,11 +93,9 @@ class MicroBenchRunner:
 
         # Fallback: try Python API
         try:
-            from microbench12.tasks import load_task
-            task = load_task(task_id)
-            if hasattr(task, "materialize"):
-                task.materialize(out_dir)
-                return True
+            from microbench12.tasks import materialize_task
+            materialize_task(task_id, out_dir, force=True)
+            return True
         except Exception as e:
             logger.warning(f"Python materialize failed for {task_id}: {e}")
         return False
@@ -141,11 +139,19 @@ class MicroBenchRunner:
 
         # Fallback: try Python grader API
         try:
-            from microbench12.grader import grade_task
-            grade_result = grade_task(task_id, workspace)
+            from microbench12.grader import grade_workspace
+            from microbench12.types import AttemptMetadata
+            meta = AttemptMetadata(
+                task_id=task_id,
+                model=model,
+                harness=harness,
+                repeat=1,
+            )
+            grade_res = grade_workspace(task_id, workspace, meta)
+            res_dict = grade_res.get("result", {})
             return {
-                "passed": getattr(grade_result, "passed", False),
-                "message": getattr(grade_result, "message", ""),
+                "passed": res_dict.get("passed", False),
+                "message": res_dict.get("summary", ""),
             }
         except Exception as e:
             return {"passed": False, "message": f"Python grade error: {e}"}
