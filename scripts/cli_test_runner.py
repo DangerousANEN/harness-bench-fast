@@ -14,6 +14,8 @@ from pathlib import Path
 
 from sqlalchemy import select
 
+from sqlalchemy.orm import selectinload
+
 # Add parent directory to sys.path to allow imports from web/
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
@@ -28,6 +30,7 @@ from web.db.models import (
     TaskStatus,
     HarnessType,
     TestSource,
+    TestGroup,
 )
 from web.engine.orchestrator import orchestrator
 from web.engine.patch_microbench import patch_microbench
@@ -40,7 +43,11 @@ patch_microbench()
 async def list_suites():
     """List all benchmark suites in the database."""
     async with async_session() as session:
-        result = await session.execute(select(Benchmark).order_by(Benchmark.created_at.desc()))
+        result = await session.execute(
+            select(Benchmark)
+            .options(selectinload(Benchmark.groups).selectinload(TestGroup.tests))
+            .order_by(Benchmark.created_at.desc())
+        )
         benchmarks = result.scalars().all()
         
         print("\n=== BENCHMARK SUITES ===")
