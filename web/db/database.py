@@ -42,7 +42,10 @@ async def init_db() -> None:
                 cols = [c["name"] for c in inspector.get_columns("benchmarks")]
                 if "benchmark_type" not in cols:
                     print("Migrating benchmarks table: adding benchmark_type column...")
-                    sync_conn.execute(text("ALTER TABLE benchmarks ADD COLUMN benchmark_type VARCHAR(50) DEFAULT 'harness_bench'"))
+                    sync_conn.execute(text("ALTER TABLE benchmarks ADD COLUMN benchmark_type VARCHAR(50) DEFAULT 'HARNESS_BENCH'"))
+                else:
+                    # Update any lowercase/incorrect values from previous attempts
+                    sync_conn.execute(text("UPDATE benchmarks SET benchmark_type = 'HARNESS_BENCH' WHERE benchmark_type = 'harness_bench' OR benchmark_type IS NULL"))
             if "test_definitions" in inspector.get_table_names():
                 cols = [c["name"] for c in inspector.get_columns("test_definitions")]
                 if "microbench_task_id" not in cols:
