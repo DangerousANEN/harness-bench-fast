@@ -705,6 +705,9 @@ export default function Home() {
                   value={runModel}
                   onChange={(e) => setRunModel(e.target.value)}
                 />
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-dimmed)', marginTop: '0.25rem' }}>
+                  For OpenRouter or DeepAgents, sets the API model. For CLI/Docker runs, use the <code>{'{model}'}</code> placeholder in the command to substitute this value dynamically.
+                </div>
               </div>
 
               <div className="form-group">
@@ -726,28 +729,28 @@ export default function Home() {
                     onChange={(e) => {
                       const val = e.target.value;
                       if (val === 'hermes_host') {
-                        setRunCliCommand('hermes chat -q');
+                        setRunCliCommand('hermes chat -q -m {model}');
                         setRunEnvVarsText('{\n  "OPENAI_API_KEY": "your-key-here",\n  "OPENAI_BASE_URL": "http://localhost:8080/v1"\n}');
                       } else if (val === 'hermes_docker') {
-                        setRunCliCommand('docker run --rm -e OPENAI_API_KEY -e OPENAI_BASE_URL -v {workspace}:/workspace -w /workspace mb12-hermes-isolated chat -q');
+                        setRunCliCommand('docker run --rm -e OPENAI_API_KEY -e OPENAI_BASE_URL -v {workspace}:/workspace -w /workspace mb12-hermes-isolated chat -q -m {model}');
                         setRunEnvVarsText('{\n  "OPENAI_API_KEY": "your-key-here",\n  "OPENAI_BASE_URL": "http://localhost:8080/v1"\n}');
                       } else if (val === 'opencode_host') {
-                        setRunCliCommand('opencode run --pure --dir . --dangerously-skip-permissions');
+                        setRunCliCommand('opencode run --pure --dir . --model {model} --dangerously-skip-permissions');
                         setRunEnvVarsText('{\n  "OPENAI_API_KEY": "your-key-here",\n  "OPENAI_BASE_URL": "http://localhost:8080/v1"\n}');
                       } else if (val === 'opencode_docker') {
-                        setRunCliCommand('docker run --rm -e OPENAI_API_KEY -e OPENAI_BASE_URL -v {workspace}:/workspace -w /workspace mb12-opencode-isolated run --pure --dir /workspace --dangerously-skip-permissions');
+                        setRunCliCommand('docker run --rm -e OPENAI_API_KEY -e OPENAI_BASE_URL -v {workspace}:/workspace -w /workspace mb12-opencode-isolated run --pure --dir /workspace --model {model} --dangerously-skip-permissions');
                         setRunEnvVarsText('{\n  "OPENAI_API_KEY": "your-key-here",\n  "OPENAI_BASE_URL": "http://localhost:8080/v1"\n}');
                       } else if (val === 'pi_host') {
-                        setRunCliCommand('pi --tools read,bash,edit,write,grep,find,ls --print');
+                        setRunCliCommand('pi --tools read,bash,edit,write,grep,find,ls --model {model} --print');
                         setRunEnvVarsText('{\n  "OPENAI_API_KEY": "your-key-here",\n  "OPENAI_BASE_URL": "http://localhost:8080/v1"\n}');
                       } else if (val === 'pi_docker') {
-                        setRunCliCommand('docker run --rm -e OPENAI_API_KEY -e OPENAI_BASE_URL -v {workspace}:/workspace -w /workspace mb12-pi-isolated --tools read,bash,edit,write,grep,find,ls --print');
+                        setRunCliCommand('docker run --rm -e OPENAI_API_KEY -e OPENAI_BASE_URL -v {workspace}:/workspace -w /workspace mb12-pi-isolated --tools read,bash,edit,write,grep,find,ls --model {model} --print');
                         setRunEnvVarsText('{\n  "OPENAI_API_KEY": "your-key-here",\n  "OPENAI_BASE_URL": "http://localhost:8080/v1"\n}');
                       } else if (val === 'openclaw_host') {
-                        setRunCliCommand('openclaw agent --local');
+                        setRunCliCommand('openclaw agent --local --model {model}');
                         setRunEnvVarsText('{\n  "OPENAI_API_KEY": "your-key-here",\n  "OPENAI_BASE_URL": "http://localhost:8080/v1"\n}');
                       } else if (val === 'openclaw_docker') {
-                        setRunCliCommand('docker run --rm -e OPENAI_API_KEY -e OPENAI_BASE_URL -v {workspace}:/workspace -w /workspace mb12-openclaw-isolated agent --local');
+                        setRunCliCommand('docker run --rm -e OPENAI_API_KEY -e OPENAI_BASE_URL -v {workspace}:/workspace -w /workspace mb12-openclaw-isolated agent --local --model {model}');
                         setRunEnvVarsText('{\n  "OPENAI_API_KEY": "your-key-here",\n  "OPENAI_BASE_URL": "http://localhost:8080/v1"\n}');
                       }
                     }}
@@ -771,7 +774,7 @@ export default function Home() {
                   <input
                     type="text"
                     className="form-input"
-                    placeholder={runHarnessType === 'microbench_cli' ? 'hermes / opencode run -m provider/model' : 'free-code -p --model haiku'}
+                    placeholder={runHarnessType === 'microbench_cli' ? 'hermes chat -q -m {model}' : 'free-code -p --model {model}'}
                     value={runCliCommand}
                     onChange={(e) => setRunCliCommand(e.target.value)}
                     required

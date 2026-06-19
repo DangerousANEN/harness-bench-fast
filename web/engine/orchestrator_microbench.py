@@ -192,8 +192,10 @@ class MicroBenchRunner:
                 harness_env["OPENAI_BASE_URL"] = base_url
                 harness_env["OPENAI_API_BASE"] = base_url
 
-            # Replace {workspace} placeholder with actual absolute workspace path
+            # Replace {workspace} and {model} placeholders
             resolved_command = cli_command.replace("{workspace}", str(workspace))
+            if model:
+                resolved_command = resolved_command.replace("{model}", model)
             argv = shlex.split(resolved_command)
             # Some harnesses accept the prompt as argument, others read TASK_PROMPT.md
             task_prompt_file = workspace / "TASK_PROMPT.md"

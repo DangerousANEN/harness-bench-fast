@@ -679,7 +679,10 @@ class BenchmarkOrchestrator:
             task.setup(workspace)
 
             # Build command
-            argv = shlex.split(cli_cmd) + [task.prompt]
+            resolved_cmd = cli_cmd.replace("{workspace}", str(workspace))
+            if run.model:
+                resolved_cmd = resolved_cmd.replace("{model}", run.model)
+            argv = shlex.split(resolved_cmd) + [task.prompt]
 
             import subprocess
             start = time.time()
