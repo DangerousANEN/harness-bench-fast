@@ -20,6 +20,8 @@ class TestCreate(BaseModel):
     verifier_config: dict = Field(default_factory=dict)
     token_budget: int = -1
     timeout_seconds: int = 600
+    microbench_task_id: str | None = None
+    grader_script: str | None = None
 
 
 class TestUpdate(BaseModel):
@@ -48,6 +50,8 @@ class TestOut(BaseModel):
     timeout_seconds: int = 600
     source: str = "custom"
     builtin_task_id: str | None = None
+    microbench_task_id: str | None = None
+    grader_script: str | None = None
     position: int = 0
     created_at: datetime | None = None
     updated_at: datetime | None = None
@@ -97,6 +101,7 @@ class GroupDetailOut(GroupOut):
 class BenchmarkCreate(BaseModel):
     name: str
     description: str = ""
+    benchmark_type: str = "harness_bench"
 
 
 class BenchmarkUpdate(BaseModel):
@@ -108,6 +113,7 @@ class BenchmarkOut(BaseModel):
     id: str
     name: str
     description: str = ""
+    benchmark_type: str = "harness_bench"
     group_count: int = 0
     total_tests: int = 0
     created_at: datetime | None = None

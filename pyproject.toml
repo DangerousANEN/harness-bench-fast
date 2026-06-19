@@ -59,6 +59,11 @@ web = [
     "websockets>=14.0",
     "python-multipart>=0.0.18",
 ]
+# `uv pip install harness-bench-fast[microbench]` for MicroBench-16 support.
+# Alternatively: pip install -e /path/to/microbench_16
+microbench = [
+    "microbench12 @ git+https://github.com/Zux1U/microbench_16.git",
+]
 
 [project.urls]
 Homepage = "https://github.com/ai-forever/harness-bench-fast"
@@ -91,6 +96,9 @@ exclude = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["harness_bench"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [dependency-groups]
 dev = [

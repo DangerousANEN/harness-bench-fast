@@ -17,6 +17,10 @@ from fastapi.staticfiles import StaticFiles
 from web.api.routers import benchmarks, runs
 from web.db.database import close_db, init_db
 from web.engine.orchestrator import orchestrator
+from web.engine.patch_microbench import patch_microbench
+
+# Apply patch for microbench tasks path
+patch_microbench()
 
 
 @asynccontextmanager

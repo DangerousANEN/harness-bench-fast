@@ -11,6 +11,7 @@ from sqlalchemy.orm import selectinload
 
 from web.db.models import (
     Benchmark,
+    BenchmarkType,
     FailureReason,
     Run,
     RunStatus,
@@ -46,9 +47,10 @@ async def get_benchmark(session: AsyncSession, benchmark_id: str) -> Benchmark |
 
 
 async def create_benchmark(
-    session: AsyncSession, *, name: str, description: str = ""
+    session: AsyncSession, *, name: str, description: str = "",
+    benchmark_type: BenchmarkType = BenchmarkType.HARNESS_BENCH,
 ) -> Benchmark:
-    bm = Benchmark(name=name, description=description)
+    bm = Benchmark(name=name, description=description, benchmark_type=benchmark_type)
     session.add(bm)
     await session.flush()
     return bm
@@ -186,6 +188,8 @@ async def create_test(
     timeout_seconds: int = 600,
     source: TestSource = TestSource.CUSTOM,
     builtin_task_id: str | None = None,
+    microbench_task_id: str | None = None,
+    grader_script: str | None = None,
 ) -> TestDefinition:
     result = await session.execute(
         select(func.coalesce(func.max(TestDefinition.position), -1) + 1).where(
@@ -206,6 +210,8 @@ async def create_test(
         timeout_seconds=timeout_seconds,
         source=source,
         builtin_task_id=builtin_task_id,
+        microbench_task_id=microbench_task_id,
+        grader_script=grader_script,
         position=position,
     )
     session.add(test)
@@ -397,6 +403,9 @@ async def get_runs_for_compare(
     result = await session.execute(
         select(Run)
         .where(Run.id.in_(run_ids))
-        .options(selectinload(Run.task_results))
+        .options(
+            selectinload(Run.task_results),
+            selectinload(Run.benchmark),
+        )
     )
     return result.scalars().all()

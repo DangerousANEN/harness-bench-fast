@@ -15,6 +15,7 @@ from web.api.ws import ws_manager
 from web.db.database import async_session
 from web.db import crud
 from web.db.models import (
+    BenchmarkType,
     FailureReason,
     Run,
     RunStatus,
@@ -242,6 +243,23 @@ class BenchmarkOrchestrator:
         total_tokens = 0
 
         try:
+            # Determine benchmark type
+            bm_type = getattr(bm, 'benchmark_type', None)
+            is_microbench = (
+                bm_type == BenchmarkType.MICROBENCH
+                or (hasattr(bm_type, 'value') and bm_type.value == 'microbench')
+            )
+            harness_type_val = run.harness_type.value if hasattr(run.harness_type, 'value') else run.harness_type
+            if harness_type_val == 'microbench_cli':
+                is_microbench = True
+
+            if is_microbench:
+                await self._execute_microbench_run(
+                    run_id, run, bm, cancel_event,
+                    start_time, completed, passed, failed, total_tokens,
+                )
+                return
+
             from harness_bench.tasks import ALL_TASKS, get_task
 
             # Map builtin_task_id → harness task
@@ -459,6 +477,188 @@ class BenchmarkOrchestrator:
                 message="",
                 elapsed_seconds=0.0,
                 error=str(e),
+            )
+
+    async def _execute_microbench_run(
+        self,
+        run_id: str,
+        run: Run,
+        bm,
+        cancel_event: threading.Event,
+        start_time: float,
+        completed: int,
+        passed: int,
+        failed: int,
+        total_tokens: int,
+    ) -> None:
+        """Execute a full benchmark run for MicroBench-16 tasks."""
+        from web.engine.orchestrator_microbench import MicroBenchRunner
+
+        runner = MicroBenchRunner()
+
+        # Get task results from DB
+        async with async_session() as session:
+            task_results = await crud.get_task_results_for_run(session, run_id)
+
+        # Map test definitions
+        test_map = {}
+        for group in bm.groups:
+            for test in group.tests:
+                test_map[test.id] = (test, group)
+
+        for tr in task_results:
+            if cancel_event.is_set():
+                break
+
+            # Find the microbench task ID
+            test, group = test_map.get(tr.test_id, (None, None))
+            microbench_task_id = None
+            if test:
+                microbench_task_id = getattr(test, 'microbench_task_id', None)
+            if not microbench_task_id:
+                microbench_task_id = tr.builtin_task_id
+
+            if not microbench_task_id:
+                async with async_session() as session:
+                    await crud.update_task_result(
+                        session, tr.id,
+                        status=TaskStatus.ERROR,
+                        message="No microbench task ID found",
+                        failure_reason=FailureReason.RUNTIME_ERROR,
+                        finished_at=datetime.now(timezone.utc),
+                    )
+                    await session.commit()
+                completed += 1
+                failed += 1
+                continue
+
+            # Mark as running
+            async with async_session() as session:
+                await crud.update_task_result(
+                    session, tr.id,
+                    status=TaskStatus.RUNNING,
+                    started_at=datetime.now(timezone.utc),
+                )
+                await session.commit()
+
+            # Execute via MicroBenchRunner
+            cli_cmd = run.cli_command or "hermes"
+            env_vars = run.env_vars or {}
+
+            mb_result = await runner.run_task(
+                task_id=microbench_task_id,
+                cli_command=cli_cmd,
+                model=run.model or "",
+                base_url=run.base_url,
+                timeout=run.timeout_seconds,
+                env_vars=env_vars,
+            )
+
+            # Classify result
+            if mb_result.passed:
+                status = TaskStatus.PASSED
+                failure = None
+            else:
+                msg = (mb_result.message or "").lower()
+                if "timeout" in msg:
+                    status = TaskStatus.TIMEOUT
+                    failure = FailureReason.TIMEOUT
+                elif mb_result.error:
+                    status = TaskStatus.ERROR
+                    failure = FailureReason.RUNTIME_ERROR
+                else:
+                    status = TaskStatus.FAILED
+                    failure = FailureReason.VERIFIER_FAILED
+
+            task_tokens = mb_result.agent_total_tokens or 0
+            tps = task_tokens / mb_result.elapsed_seconds if mb_result.elapsed_seconds > 0 and task_tokens else None
+
+            async with async_session() as session:
+                await crud.update_task_result(
+                    session, tr.id,
+                    status=status,
+                    message=mb_result.message,
+                    error_detail=mb_result.agent_transcript,
+                    elapsed_seconds=mb_result.elapsed_seconds,
+                    agent_steps=mb_result.agent_steps,
+                    agent_tool_calls=mb_result.agent_tool_calls,
+                    agent_input_tokens=mb_result.agent_input_tokens,
+                    agent_output_tokens=mb_result.agent_output_tokens,
+                    agent_total_tokens=task_tokens or None,
+                    tokens_per_second=tps,
+                    failure_reason=failure,
+                    finished_at=datetime.now(timezone.utc),
+                )
+                await session.commit()
+
+            completed += 1
+            if status == TaskStatus.PASSED:
+                passed += 1
+            else:
+                failed += 1
+            total_tokens += task_tokens
+
+            elapsed_total = time.time() - start_time
+            total_tasks = len(task_results)
+            est_remaining = None
+            if completed > 0:
+                est_remaining = (elapsed_total / completed) * (total_tasks - completed)
+            avg_tps = total_tokens / elapsed_total if elapsed_total > 0 else 0
+
+            async with async_session() as session:
+                await crud.update_run_stats(
+                    session, run_id,
+                    completed_tasks=completed,
+                    passed_tasks=passed,
+                    failed_tasks=failed,
+                    total_tokens=total_tokens,
+                    avg_tokens_per_second=avg_tps,
+                )
+                await session.commit()
+
+            if self._loop:
+                asyncio.run_coroutine_threadsafe(
+                    ws_manager.send_task_update(run_id, {
+                        "task_name": tr.task_name,
+                        "status": status.value,
+                        "tokens": task_tokens,
+                        "elapsed": mb_result.elapsed_seconds,
+                    }, {
+                        "completed_tasks": completed,
+                        "passed_tasks": passed,
+                        "failed_tasks": failed,
+                        "elapsed_seconds": elapsed_total,
+                        "estimated_remaining_seconds": est_remaining,
+                        "total_tokens": total_tokens,
+                        "tokens_per_second": avg_tps,
+                    }),
+                    self._loop,
+                )
+
+        # Finalize
+        final_status = RunStatus.CANCELLED if cancel_event.is_set() else RunStatus.COMPLETED
+        async with async_session() as session:
+            await crud.update_run_status(
+                session, run_id, final_status,
+                finished_at=datetime.now(timezone.utc),
+            )
+            await crud.update_run_stats(
+                session, run_id,
+                completed_tasks=completed,
+                passed_tasks=passed,
+                failed_tasks=failed,
+                total_tokens=total_tokens,
+            )
+            await session.commit()
+
+        if self._loop:
+            asyncio.run_coroutine_threadsafe(
+                ws_manager.send_run_completed(run_id, {
+                    "status": final_status.value,
+                    "completed_tasks": completed,
+                    "passed_tasks": passed,
+                }),
+                self._loop,
             )
 
     async def _run_cli_task(self, task, run: Run):

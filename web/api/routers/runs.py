@@ -27,7 +27,13 @@ router = APIRouter(prefix="/api/runs", tags=["runs"])
 
 
 def _run_to_out(run) -> RunOut:
-    return RunOut.model_validate(run)
+    out = RunOut.model_validate(run)
+    from sqlalchemy import inspect
+    insp = inspect(run)
+    if insp and "benchmark" not in insp.unloaded and run.benchmark:
+        bt = run.benchmark.benchmark_type
+        out.benchmark_type = bt.value if hasattr(bt, 'value') else str(bt)
+    return out
 
 
 def _run_to_detail(run) -> RunDetailOut:
@@ -95,6 +101,7 @@ async def create_run(body: RunCreate, db: AsyncSession = Depends(get_db)):
     )
     # Set total tasks
     run.total_tasks = total
+    run.benchmark = bm
     await db.flush()
     await db.commit()
 

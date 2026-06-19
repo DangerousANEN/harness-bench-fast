@@ -44,7 +44,7 @@ class TaskResultOut(BaseModel):
 class RunCreate(BaseModel):
     name: str = ""
     benchmark_id: str
-    harness_type: str  # deepagents | openrouter | cli | pure
+    harness_type: str  # deepagents | openrouter | cli | pure | microbench_cli
     model: str = ""
     base_url: str | None = None
     cli_command: str | None = None
@@ -79,6 +79,7 @@ class RunOut(BaseModel):
     started_at: datetime | None = None
     finished_at: datetime | None = None
     created_at: datetime | None = None
+    benchmark_type: str | None = None
 
     model_config = {"from_attributes": True}
 

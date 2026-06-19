@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from web.api.deps import get_db
 from web.db import crud
-from web.db.models import TestSource
+from web.db.models import BenchmarkType, TestSource
 from web.schemas.benchmarks import (
     BenchmarkCreate,
     BenchmarkDetailOut,
@@ -48,6 +48,7 @@ def _bm_to_out(bm) -> BenchmarkOut:
         id=bm.id,
         name=bm.name,
         description=bm.description,
+        benchmark_type=bm.benchmark_type.value if hasattr(bm.benchmark_type, 'value') else str(bm.benchmark_type),
         group_count=len(groups),
         total_tests=total_tests,
         created_at=bm.created_at,
@@ -111,7 +112,11 @@ async def get_benchmark(benchmark_id: str, db: AsyncSession = Depends(get_db)):
 
 @router.post("/api/benchmarks", response_model=BenchmarkOut, status_code=201)
 async def create_benchmark(body: BenchmarkCreate, db: AsyncSession = Depends(get_db)):
-    bm = await crud.create_benchmark(db, name=body.name, description=body.description)
+    bm_type = BenchmarkType(body.benchmark_type) if body.benchmark_type else BenchmarkType.HARNESS_BENCH
+    bm = await crud.create_benchmark(
+        db, name=body.name, description=body.description,
+        benchmark_type=bm_type,
+    )
     return _bm_to_out(bm)
 
 
@@ -183,6 +188,7 @@ async def import_builtin_tasks(benchmark_id: str, db: AsyncSession = Depends(get
             )
 
     # Refresh
+    db.expire_all()
     bm = await crud.get_benchmark(db, benchmark_id)
     return _bm_to_detail(bm)
 
@@ -214,6 +220,132 @@ def _verifier_type_name(task) -> str:
     v = task.verifier
     name = getattr(v, "__name__", "") or type(v).__name__
     return name or "builtin"
+
+
+# ==== MicroBench Import ====
+
+
+# Mapping of microbench task slugs to language/category groups
+_MICROBENCH_GROUPS = {
+    "Python": [
+        "py_rate_limiter_sliding_window",
+        "py_shortest_path_with_path_reconstruction",
+        "py_strict_chat_prompt_normalizer",
+    ],
+    "PyTorch / ML": [
+        "pt_kv_cache_generate",
+        "pt_logit_lens_layers",
+        "pt_prompt_blend_prob_space",
+        "pt_rope_gqa_layouts",
+    ],
+    "JAX / ML": [
+        "jax_complex_lp_filtered_mrr",
+    ],
+    "C / C++": [
+        "c_ring_buffer_overwrite_semantics",
+        "cpp_csv_groupby_quoted_fields",
+    ],
+    "Rust": [
+        "rs_arena_graph_storage",
+    ],
+    "SQL": [
+        "sql_recursive_org_chart",
+        "sql_retention_rolling_7d",
+        "sql_sessionize_gap_30m",
+    ],
+    "Service / Repo": [
+        "svc_boot_healthcheck",
+        "repo_root_cause_trace_qna",
+    ],
+    "TypeScript": [
+        "ts_topological_sort",
+    ],
+}
+
+
+@router.post("/api/benchmarks/{benchmark_id}/import-microbench", response_model=BenchmarkDetailOut)
+async def import_microbench_tasks(benchmark_id: str, db: AsyncSession = Depends(get_db)):
+    """Import all 16 built-in tasks from microbench_16 into this benchmark."""
+    bm = await crud.get_benchmark(db, benchmark_id)
+    if bm is None:
+        raise HTTPException(404, "Benchmark not found")
+
+    try:
+        from microbench12.tasks import list_task_ids, load_task, load_prompt
+    except ImportError:
+        raise HTTPException(500, "microbench12 package not installed. Install with: pip install -e /path/to/microbench_16")
+
+    all_tasks = [load_task(tid) for tid in list_task_ids()]
+
+    # Build slug → task map
+    task_map = {t.id: t for t in all_tasks}
+
+    for group_name, slugs in _MICROBENCH_GROUPS.items():
+        matching = [task_map[s] for s in slugs if s in task_map]
+        if not matching:
+            continue
+
+        group = await crud.create_group(
+            db,
+            benchmark_id=benchmark_id,
+            name=group_name,
+            description=f"{len(matching)} microbench tasks",
+        )
+
+        for task in matching:
+            prompt_text = load_prompt(task.id)
+            tags = getattr(task, "tags", []) or []
+            if isinstance(tags, set):
+                tags = list(tags)
+
+            # Collect starter files as setup_files
+            setup = {}
+            starter_files = getattr(task, "starter_files", None)
+            if starter_files and isinstance(starter_files, dict):
+                setup = {k: v for k, v in starter_files.items() if isinstance(v, str)}
+
+            await crud.create_test(
+                db,
+                group_id=group.id,
+                name=task.id,
+                prompt=prompt_text,
+                tags=tags,
+                setup_files=setup,
+                verifier_type="microbench_grader",
+                source=TestSource.BUILTIN,
+                microbench_task_id=task.id,
+                grader_script=f"tasks/{task.id}/grader/grade.py",
+            )
+
+    # Also import any tasks not covered by the static groups
+    covered = set()
+    for slugs in _MICROBENCH_GROUPS.values():
+        covered.update(slugs)
+    uncovered = [t for t in all_tasks if t.id not in covered]
+    if uncovered:
+        group = await crud.create_group(
+            db,
+            benchmark_id=benchmark_id,
+            name="Other",
+            description=f"{len(uncovered)} microbench tasks",
+        )
+        for task in uncovered:
+            prompt_text = load_prompt(task.id)
+            await crud.create_test(
+                db,
+                group_id=group.id,
+                name=task.id,
+                prompt=prompt_text,
+                verifier_type="microbench_grader",
+                source=TestSource.BUILTIN,
+                microbench_task_id=task.id,
+                grader_script=f"tasks/{task.id}/grader/grade.py",
+            )
+
+    # Refresh
+    db.expire_all()
+    bm = await crud.get_benchmark(db, benchmark_id)
+    return _bm_to_detail(bm)
 
 
 # ==== Groups ====

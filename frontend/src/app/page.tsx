@@ -51,6 +51,7 @@ export default function Home() {
   // Create Benchmark Form state
   const [bmName, setBmName] = useState('');
   const [bmDescription, setBmDescription] = useState('');
+  const [bmBenchmarkType, setBmBenchmarkType] = useState('harness_bench');
   const [isCreatingBenchmark, setIsCreatingBenchmark] = useState(false);
 
   // Group Form state
@@ -221,7 +222,7 @@ export default function Home() {
           harness_type: runHarnessType,
           model: runModel,
           base_url: runBaseUrl || null,
-          cli_command: runHarnessType === 'cli' ? runCliCommand : null,
+          cli_command: (runHarnessType === 'cli' || runHarnessType === 'microbench_cli') ? runCliCommand : null,
           env_vars: envVars,
           concurrency: runConcurrency,
           timeout_seconds: runTimeout,
@@ -316,12 +317,13 @@ export default function Home() {
       const res = await fetch(`${getApiBase()}/api/benchmarks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: bmName, description: bmDescription }),
+        body: JSON.stringify({ name: bmName, description: bmDescription, benchmark_type: bmBenchmarkType }),
       });
       if (res.ok) {
         const data = await res.json();
         setBmName('');
         setBmDescription('');
+        setBmBenchmarkType('harness_bench');
         fetchBenchmarks();
         fetchBenchmarkDetails(data.id);
       }
@@ -356,6 +358,24 @@ export default function Home() {
         fetchBenchmarkDetails(id);
       } else {
         alert('Import failed. Make sure harness-bench-fast is installed.');
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsCreatingBenchmark(false);
+    }
+  };
+
+  // Import MicroBench Tasks
+  const handleImportMicrobench = async (id: string) => {
+    if (!confirm('Import all 16 MicroBench tasks? This will populate the benchmark with Python, C/C++, Rust, SQL, PyTorch, and JAX tasks.')) return;
+    setIsCreatingBenchmark(true);
+    try {
+      const res = await fetch(`${getApiBase()}/api/benchmarks/${id}/import-microbench`, { method: 'POST' });
+      if (res.ok) {
+        fetchBenchmarkDetails(id);
+      } else {
+        alert('Import failed. Make sure microbench12 is installed.');
       }
     } catch (err) {
       console.error(err);
@@ -654,7 +674,7 @@ export default function Home() {
                 >
                   {benchmarks.map((b) => (
                     <option key={b.id} value={b.id}>
-                      {b.name} ({b.total_tests} tasks)
+                      {b.name} ({b.total_tests} tasks){b.benchmark_type === 'microbench' ? ' [MB]' : ''}
                     </option>
                   ))}
                   {benchmarks.length === 0 && <option value="">No benchmarks available</option>}
@@ -669,6 +689,7 @@ export default function Home() {
                   onChange={(e) => setRunHarnessType(e.target.value)}
                 >
                   <option value="cli">CLI Runner (Shell command)</option>
+                  <option value="microbench_cli">MicroBench CLI (materialize + grade)</option>
                   <option value="deepagents">DeepAgents (with GigaChat profile)</option>
                   <option value="pure">Pure DeepAgents (without GigaChat profile)</option>
                   <option value="openrouter">OpenRouter (Third-party models)</option>
@@ -697,13 +718,13 @@ export default function Home() {
                 />
               </div>
 
-              {runHarnessType === 'cli' && (
+              {(runHarnessType === 'cli' || runHarnessType === 'microbench_cli') && (
                 <div className="form-group">
-                  <label className="form-label">CLI Command template</label>
+                  <label className="form-label">{runHarnessType === 'microbench_cli' ? 'Harness CLI Command' : 'CLI Command template'}</label>
                   <input
                     type="text"
                     className="form-input"
-                    placeholder="free-code -p --model haiku"
+                    placeholder={runHarnessType === 'microbench_cli' ? 'hermes / opencode run -m provider/model' : 'free-code -p --model haiku'}
                     value={runCliCommand}
                     onChange={(e) => setRunCliCommand(e.target.value)}
                     required
@@ -1077,7 +1098,12 @@ export default function Home() {
                   onClick={() => fetchBenchmarkDetails(b.id)}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h3 className="card-title">{b.name}</h3>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <h3 className="card-title">{b.name}</h3>
+                      <span className={`badge ${b.benchmark_type === 'microbench' ? 'badge-running' : 'badge-success'}`} style={{ fontSize: '0.6rem', padding: '0.1rem 0.3rem' }}>
+                        {b.benchmark_type === 'microbench' ? 'microbench' : 'harness'}
+                      </span>
+                    </div>
                     <button
                       className="btn btn-danger"
                       style={{ padding: '0.2rem 0.5rem', fontSize: '0.65rem' }}
@@ -1117,6 +1143,18 @@ export default function Home() {
                   placeholder="Suite description"
                 />
               </div>
+              <div className="form-group">
+                <label className="form-label">Benchmark Type</label>
+                <select
+                  className="form-select"
+                  value={bmBenchmarkType}
+                  onChange={(e) => setBmBenchmarkType(e.target.value)}
+                  required
+                >
+                  <option value="harness_bench">harness-bench-fast (298 tasks)</option>
+                  <option value="microbench">MicroBench-16 (16 tasks)</option>
+                </select>
+              </div>
               <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={isCreatingBenchmark}>
                 CREATE SUITE
               </button>
@@ -1132,9 +1170,15 @@ export default function Home() {
                     <h2 style={{ fontSize: '2.2rem' }}>{selectedBenchmark.name}</h2>
                     <p style={{ color: 'var(--text-dimmed)', fontSize: '0.9rem' }}>{selectedBenchmark.description}</p>
                   </div>
-                  <button className="btn btn-primary" onClick={() => handleImportBuiltins(selectedBenchmark.id)} disabled={isCreatingBenchmark}>
-                    Import 298 Builtin Tasks
-                  </button>
+                  {selectedBenchmark.benchmark_type === 'microbench' ? (
+                    <button className="btn btn-primary" onClick={() => handleImportMicrobench(selectedBenchmark.id)} disabled={isCreatingBenchmark}>
+                      Import 16 MicroBench Tasks
+                    </button>
+                  ) : (
+                    <button className="btn btn-primary" onClick={() => handleImportBuiltins(selectedBenchmark.id)} disabled={isCreatingBenchmark}>
+                      Import 298 Builtin Tasks
+                    </button>
+                  )}
                 </div>
 
                 {/* Groups structure */}
@@ -1143,7 +1187,7 @@ export default function Home() {
                   
                   {selectedBenchmark.groups?.length === 0 ? (
                     <div style={{ padding: '2rem', textAlign: 'center', border: '1px dashed var(--border-color)', color: 'var(--text-dimmed)', fontFamily: 'var(--font-mono)', marginBottom: '2rem' }}>
-                      THIS SUITE IS EMPTY. ADD GROUPS AND TESTS BELOW OR IMPORT BUILTINS.
+                      THIS SUITE IS EMPTY. ADD GROUPS AND TESTS BELOW OR IMPORT TASKS.
                     </div>
                   ) : (
                     selectedBenchmark.groups?.map((g: any) => (

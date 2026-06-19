@@ -46,11 +46,17 @@ class RunStatus(str, enum.Enum):
     FAILED = "failed"
 
 
+class BenchmarkType(str, enum.Enum):
+    HARNESS_BENCH = "harness_bench"
+    MICROBENCH = "microbench"
+
+
 class HarnessType(str, enum.Enum):
     DEEPAGENTS = "deepagents"
     OPENROUTER = "openrouter"
     CLI = "cli"
     PURE = "pure"
+    MICROBENCH_CLI = "microbench_cli"
 
 
 class TaskStatus(str, enum.Enum):
@@ -101,6 +107,9 @@ class Benchmark(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str] = mapped_column(Text, default="")
+    benchmark_type: Mapped[BenchmarkType] = mapped_column(
+        Enum(BenchmarkType), default=BenchmarkType.HARNESS_BENCH
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
@@ -165,6 +174,8 @@ class TestDefinition(Base):
         Enum(TestSource), default=TestSource.CUSTOM
     )
     builtin_task_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    microbench_task_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    grader_script: Mapped[str | None] = mapped_column(Text, nullable=True)
     position: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(
