@@ -35,6 +35,24 @@ async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit
 async def init_db() -> None:
     """Create all tables and seed with the built-in 298 tasks benchmark if empty."""
     async with engine.begin() as conn:
+        from sqlalchemy import inspect, text
+        def run_migrations(sync_conn):
+            inspector = inspect(sync_conn)
+            if "benchmarks" in inspector.get_table_names():
+                cols = [c["name"] for c in inspector.get_columns("benchmarks")]
+                if "benchmark_type" not in cols:
+                    print("Migrating benchmarks table: adding benchmark_type column...")
+                    sync_conn.execute(text("ALTER TABLE benchmarks ADD COLUMN benchmark_type VARCHAR(50) DEFAULT 'harness_bench'"))
+            if "test_definitions" in inspector.get_table_names():
+                cols = [c["name"] for c in inspector.get_columns("test_definitions")]
+                if "microbench_task_id" not in cols:
+                    print("Migrating test_definitions table: adding microbench_task_id column...")
+                    sync_conn.execute(text("ALTER TABLE test_definitions ADD COLUMN microbench_task_id VARCHAR(255)"))
+                if "grader_script" not in cols:
+                    print("Migrating test_definitions table: adding grader_script column...")
+                    sync_conn.execute(text("ALTER TABLE test_definitions ADD COLUMN grader_script TEXT"))
+
+        await conn.run_sync(run_migrations)
         await conn.run_sync(Base.metadata.create_all)
 
     from web.db import crud
