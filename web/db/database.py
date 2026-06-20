@@ -42,7 +42,11 @@ async def init_db() -> None:
                 cols = [c["name"] for c in inspector.get_columns("benchmarks")]
                 if "benchmark_type" not in cols:
                     print("Migrating benchmarks table: adding benchmark_type column...")
-                    sync_conn.execute(text("ALTER TABLE benchmarks ADD COLUMN benchmark_type VARCHAR(50) DEFAULT 'HARNESS_BENCH'"))
+                    try:
+                        sync_conn.execute(text("ALTER TABLE benchmarks ADD COLUMN benchmark_type VARCHAR(50) DEFAULT 'HARNESS_BENCH'"))
+                    except Exception as e:
+                        if "duplicate" not in str(e).lower() and "already exists" not in str(e).lower():
+                            raise
                 else:
                     # Update any lowercase/incorrect values from previous attempts
                     sync_conn.execute(text("UPDATE benchmarks SET benchmark_type = 'HARNESS_BENCH' WHERE benchmark_type = 'harness_bench' OR benchmark_type IS NULL"))
@@ -50,10 +54,18 @@ async def init_db() -> None:
                 cols = [c["name"] for c in inspector.get_columns("test_definitions")]
                 if "microbench_task_id" not in cols:
                     print("Migrating test_definitions table: adding microbench_task_id column...")
-                    sync_conn.execute(text("ALTER TABLE test_definitions ADD COLUMN microbench_task_id VARCHAR(255)"))
+                    try:
+                        sync_conn.execute(text("ALTER TABLE test_definitions ADD COLUMN microbench_task_id VARCHAR(255)"))
+                    except Exception as e:
+                        if "duplicate" not in str(e).lower() and "already exists" not in str(e).lower():
+                            raise
                 if "grader_script" not in cols:
                     print("Migrating test_definitions table: adding grader_script column...")
-                    sync_conn.execute(text("ALTER TABLE test_definitions ADD COLUMN grader_script TEXT"))
+                    try:
+                        sync_conn.execute(text("ALTER TABLE test_definitions ADD COLUMN grader_script TEXT"))
+                    except Exception as e:
+                        if "duplicate" not in str(e).lower() and "already exists" not in str(e).lower():
+                            raise
 
         await conn.run_sync(run_migrations)
         await conn.run_sync(Base.metadata.create_all)

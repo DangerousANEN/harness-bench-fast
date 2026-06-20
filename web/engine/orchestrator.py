@@ -35,7 +35,6 @@ _TRANSIENT_ERROR_PATTERN = re.compile(
 
 
 def parse_tokens_from_text(text: str) -> dict[str, int]:
-    import re
     # Match various formats
     prompt_patterns = [
         r"(?:prompt|input)[_-]tokens\s*[:=]\s*(\d+)",
@@ -119,6 +118,7 @@ def get_hermes_tokens_for_prompt(prompt: str, start_time: float, end_time: float
     db_path = os.path.expanduser("~/.hermes/state.db")
     if not os.path.exists(db_path):
         return {}
+    conn = None
     try:
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
@@ -160,6 +160,9 @@ def get_hermes_tokens_for_prompt(prompt: str, start_time: float, end_time: float
             }
     except Exception as e:
         logger.warning(f"Failed to query hermes database for stats: {e}")
+    finally:
+        if conn is not None:
+            conn.close()
     return {}
 
 
@@ -188,14 +191,20 @@ class BenchmarkOrchestrator:
 
     def _run_worker(self, run_id: str, cancel_event: threading.Event) -> None:
         """Worker thread that executes a benchmark run."""
+        loop = asyncio.new_event_loop()
         try:
-            loop = asyncio.new_event_loop()
             loop.run_until_complete(self._execute_run(run_id, cancel_event))
         except Exception:
             logger.exception(f"Run {run_id} failed with exception")
-            loop2 = asyncio.new_event_loop()
-            loop2.run_until_complete(self._mark_run_failed(run_id))
+            try:
+                loop.run_until_complete(self._mark_run_failed(run_id))
+            except Exception:
+                logger.exception(f"Failed to mark run {run_id} as failed")
         finally:
+            try:
+                loop.close()
+            except Exception:
+                pass
             self._active_runs.pop(run_id, None)
 
     async def _execute_run(self, run_id: str, cancel_event: threading.Event) -> None:
@@ -212,16 +221,33 @@ class BenchmarkOrchestrator:
             )
             await session.commit()
 
-        # Collect all tasks from the benchmark
+        # Collect all tasks from the benchmark and build budget maps
+        test_map = {}
+        is_microbench = False
         async with async_session() as session:
             bm = await crud.get_benchmark(session, run.benchmark_id)
             if bm is None:
                 return
 
+            # Check benchmark type
+            bm_type = getattr(bm, 'benchmark_type', None)
+            is_microbench = (
+                bm_type == BenchmarkType.MICROBENCH
+                or (hasattr(bm_type, 'value') and bm_type.value == 'microbench')
+            )
+            harness_type_val = run.harness_type.value if hasattr(run.harness_type, 'value') else run.harness_type
+            if harness_type_val == 'microbench_cli':
+                is_microbench = True
+
             all_tests = []
             for group in bm.groups:
+                group_default_budget = group.default_token_budget or -1
                 for test in group.tests:
                     all_tests.append(test)
+                    test_map[test.id] = {
+                        "token_budget": test.token_budget or -1,
+                        "default_token_budget": group_default_budget
+                    }
 
             # Create TaskResult entries for each test
             for i, test in enumerate(all_tests):
@@ -243,19 +269,9 @@ class BenchmarkOrchestrator:
         total_tokens = 0
 
         try:
-            # Determine benchmark type
-            bm_type = getattr(bm, 'benchmark_type', None)
-            is_microbench = (
-                bm_type == BenchmarkType.MICROBENCH
-                or (hasattr(bm_type, 'value') and bm_type.value == 'microbench')
-            )
-            harness_type_val = run.harness_type.value if hasattr(run.harness_type, 'value') else run.harness_type
-            if harness_type_val == 'microbench_cli':
-                is_microbench = True
-
             if is_microbench:
                 await self._execute_microbench_run(
-                    run_id, run, bm, cancel_event,
+                    run_id, run, None, cancel_event,
                     start_time, completed, passed, failed, total_tokens,
                 )
                 return
@@ -264,12 +280,6 @@ class BenchmarkOrchestrator:
 
             # Map builtin_task_id → harness task
             builtin_map = {t.id: t for t in ALL_TASKS}
-
-            # Map test definitions to check budget
-            test_map = {}
-            for group in bm.groups:
-                for test in group.tests:
-                    test_map[test.id] = (test, group)
 
             # Get task results from DB
             async with async_session() as session:
@@ -327,13 +337,13 @@ class BenchmarkOrchestrator:
                 )
 
                 # Find test-level token budget
-                test, group = test_map.get(tr.test_id, (None, None))
+                test_info = test_map.get(tr.test_id)
                 test_budget = -1
-                if test:
-                    if test.token_budget > 0:
-                        test_budget = test.token_budget
-                    elif group and group.default_token_budget > 0:
-                        test_budget = group.default_token_budget
+                if test_info:
+                    if test_info["token_budget"] > 0:
+                        test_budget = test_info["token_budget"]
+                    elif test_info["default_token_budget"] > 0:
+                        test_budget = test_info["default_token_budget"]
 
                 # Classify result
                 status, failure = self._classify_result(task_run, run, test_budget)
@@ -496,27 +506,22 @@ class BenchmarkOrchestrator:
 
         runner = MicroBenchRunner()
 
-        # Get task results from DB
+        # Get task results and benchmark info from DB
+        test_map = {}
         async with async_session() as session:
             task_results = await crud.get_task_results_for_run(session, run_id)
-
-        # Map test definitions
-        test_map = {}
-        for group in bm.groups:
-            for test in group.tests:
-                test_map[test.id] = (test, group)
+            bm_db = await crud.get_benchmark(session, run.benchmark_id)
+            if bm_db:
+                for group in bm_db.groups:
+                    for test in group.tests:
+                        test_map[test.id] = getattr(test, 'microbench_task_id', None) or test.builtin_task_id
 
         for tr in task_results:
             if cancel_event.is_set():
                 break
 
             # Find the microbench task ID
-            test, group = test_map.get(tr.test_id, (None, None))
-            microbench_task_id = None
-            if test:
-                microbench_task_id = getattr(test, 'microbench_task_id', None)
-            if not microbench_task_id:
-                microbench_task_id = tr.builtin_task_id
+            microbench_task_id = test_map.get(tr.test_id) or tr.builtin_task_id
 
             if not microbench_task_id:
                 async with async_session() as session:
@@ -686,10 +691,15 @@ class BenchmarkOrchestrator:
 
             import subprocess
             start = time.time()
+            # Pass panel custom env vars to subprocess
+            run_env = {**os.environ}
+            if run.env_vars:
+                run_env.update({k: str(v) for k, v in run.env_vars.items()})
             try:
                 result = subprocess.run(
                     argv, cwd=workspace, capture_output=True, text=True,
                     timeout=timeout, encoding="utf-8", errors="replace",
+                    env=run_env,
                 )
             except subprocess.TimeoutExpired:
                 elapsed = time.time() - start
@@ -725,85 +735,155 @@ class BenchmarkOrchestrator:
             )
 
     async def _run_openrouter_task(self, task, run: Run):
-        """Run a task via OpenRouter runner."""
-        from harness_bench.runner_openrouter import run_task as or_run_task
+        """Run a task via OpenRouter runner in a subprocess for env isolation."""
+        import sys
         import os
+        import json
+        import subprocess
+        from tempfile import NamedTemporaryFile
+        from harness_bench.runner import TaskRun
 
-        # Apply env vars
-        old_env = {}
+        run_env = {**os.environ}
         if run.env_vars:
-            for k, v in run.env_vars.items():
-                old_env[k] = os.environ.get(k)
-                os.environ[k] = str(v)
+            run_env.update({k: str(v) for k, v in run.env_vars.items()})
 
         # Apply model base url override if specified
         if run.base_url:
-            old_env["OPENROUTER_BASE_URL"] = os.environ.get("OPENROUTER_BASE_URL")
-            os.environ["OPENROUTER_BASE_URL"] = run.base_url
+            run_env["OPENROUTER_BASE_URL"] = run.base_url
+
+        # Generate a unique path for the JSON results
+        with NamedTemporaryFile(suffix=".json", delete=False) as tmp:
+            tmp_path = tmp.name
 
         try:
+            argv = [
+                sys.executable, "-m", "harness_bench", "run-openrouter",
+                "--task", task.id,
+                "--model", run.model or "qwen/qwen3.6-plus",
+                "--recursion-limit", str(run.recursion_limit or 80),
+                "--json-output", tmp_path,
+            ]
+            
+            # Run in subprocess
             loop = asyncio.get_running_loop()
-            task_run = await loop.run_in_executor(
+            await loop.run_in_executor(
                 None,
-                lambda: or_run_task(
-                    task,
-                    model_name=run.model or "qwen/qwen3.6-plus",
-                    recursion_limit=run.recursion_limit or 80,
+                lambda: subprocess.run(
+                    argv, capture_output=True, text=True,
+                    encoding="utf-8", errors="replace", env=run_env
                 )
             )
-            return task_run
+            
+            # Read output JSON
+            with open(tmp_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                
+            task_data = data["tasks"][0]
+            return TaskRun(
+                task_id=task_data["task_id"],
+                passed=task_data["passed"],
+                message=task_data["message"],
+                elapsed_seconds=task_data["elapsed_seconds"],
+                error=task_data.get("error"),
+                agent_steps=task_data.get("agent_steps"),
+                agent_tool_calls=task_data.get("agent_tool_calls"),
+                agent_shell_commands=task_data.get("agent_shell_commands"),
+                agent_events=task_data.get("agent_events"),
+                agent_llm_calls=task_data.get("agent_llm_calls"),
+                agent_input_tokens=task_data.get("agent_input_tokens"),
+                agent_output_tokens=task_data.get("agent_output_tokens"),
+                agent_total_tokens=task_data.get("agent_total_tokens"),
+            )
+        except Exception as e:
+            return TaskRun(
+                task_id=task.id,
+                passed=False,
+                message="",
+                elapsed_seconds=0.0,
+                error=f"Subprocess run failed: {e}",
+            )
         finally:
-            # Restore env vars
-            for k, v in old_env.items():
-                if v is None:
-                    os.environ.pop(k, None)
-                else:
-                    os.environ[k] = v
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
 
     async def _run_deepagents_task(self, task, run: Run):
-        """Run a task via DeepAgents/Pure GigaChat runner."""
+        """Run a task via DeepAgents/Pure GigaChat runner in a subprocess for env isolation."""
+        import sys
         import os
-        harness_type = run.harness_type.value if hasattr(run.harness_type, "value") else run.harness_type
-        
-        if harness_type == "pure":
-            from harness_bench.runner_pure import run_task as pure_run_task
-            run_fn = pure_run_task
-        else:
-            from harness_bench.runner import run_task as da_run_task
-            run_fn = da_run_task
+        import json
+        import subprocess
+        from tempfile import NamedTemporaryFile
+        from harness_bench.runner import TaskRun
 
-        # Apply env vars
-        old_env = {}
+        harness_type = run.harness_type.value if hasattr(run.harness_type, "value") else run.harness_type
+        subcmd = "run-pure" if harness_type == "pure" else "run"
+
+        run_env = {**os.environ}
         if run.env_vars:
-            for k, v in run.env_vars.items():
-                old_env[k] = os.getenv(k)
-                os.environ[k] = str(v)
+            run_env.update({k: str(v) for k, v in run.env_vars.items()})
 
         if run.model:
-            old_env["GIGACHAT_MODEL"] = os.getenv("GIGACHAT_MODEL")
-            os.environ["GIGACHAT_MODEL"] = run.model
+            run_env["GIGACHAT_MODEL"] = run.model
 
         if run.base_url:
-            old_env["GIGACHAT_BASE_URL"] = os.getenv("GIGACHAT_BASE_URL")
-            os.environ["GIGACHAT_BASE_URL"] = run.base_url
+            run_env["GIGACHAT_BASE_URL"] = run.base_url
+
+        with NamedTemporaryFile(suffix=".json", delete=False) as tmp:
+            tmp_path = tmp.name
 
         try:
+            argv = [
+                sys.executable, "-m", "harness_bench", subcmd,
+                "--task", task.id,
+                "--recursion-limit", str(run.recursion_limit or 80),
+                "--json-output", tmp_path,
+            ]
+            
+            # Run in subprocess
             loop = asyncio.get_running_loop()
-            task_run = await loop.run_in_executor(
+            await loop.run_in_executor(
                 None,
-                lambda: run_fn(
-                    task,
-                    recursion_limit=run.recursion_limit or 80,
+                lambda: subprocess.run(
+                    argv, capture_output=True, text=True,
+                    encoding="utf-8", errors="replace", env=run_env
                 )
             )
-            return task_run
+            
+            # Read output JSON
+            with open(tmp_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                
+            task_data = data["tasks"][0]
+            return TaskRun(
+                task_id=task_data["task_id"],
+                passed=task_data["passed"],
+                message=task_data["message"],
+                elapsed_seconds=task_data["elapsed_seconds"],
+                error=task_data.get("error"),
+                agent_steps=task_data.get("agent_steps"),
+                agent_tool_calls=task_data.get("agent_tool_calls"),
+                agent_shell_commands=task_data.get("agent_shell_commands"),
+                agent_events=task_data.get("agent_events"),
+                agent_llm_calls=task_data.get("agent_llm_calls"),
+                agent_input_tokens=task_data.get("agent_input_tokens"),
+                agent_output_tokens=task_data.get("agent_output_tokens"),
+                agent_total_tokens=task_data.get("agent_total_tokens"),
+            )
+        except Exception as e:
+            return TaskRun(
+                task_id=task.id,
+                passed=False,
+                message="",
+                elapsed_seconds=0.0,
+                error=f"Subprocess run failed: {e}",
+            )
         finally:
-            # Restore env vars
-            for k, v in old_env.items():
-                if v is None:
-                    os.environ.pop(k, None)
-                else:
-                    os.environ[k] = v
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
 
     def _classify_result(self, task_run, run: Run, test_budget: int = -1) -> tuple[TaskStatus, FailureReason | None]:
         """Classify task result into status + failure reason."""

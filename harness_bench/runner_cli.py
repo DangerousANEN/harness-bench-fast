@@ -312,6 +312,27 @@ def _cleanup_workspace_keepalive(
     return workspace
 
 
+def _cleanup_path(path: Path, *, task_id: str) -> None:
+    import shutil
+    last_exc: OSError | None = None
+    for attempt, delay in enumerate((0.0, *_CLEANUP_RETRY_DELAYS), start=1):
+        if delay:
+            gc.collect()
+            time.sleep(delay)
+        try:
+            shutil.rmtree(path)
+            return
+        except OSError as exc:
+            last_exc = exc
+            if attempt <= len(_CLEANUP_RETRY_DELAYS):
+                continue
+    print(
+        f"[WARN] cleanup failed for {task_id} workspace {path}: {last_exc}; "
+        "leaving it for inspection",
+        file=sys.stderr,
+    )
+
+
 def _get_gigachat_access_token() -> str | None:
     """Fetch / refresh a GigaChat IFT access token from `GIGACHAT_TOKEN_URL`.
 
@@ -490,8 +511,10 @@ def run_task_cli(
     # CLI, inject the workspace AGENTS.md via `--append-system-prompt` so
     # the agent sees the same ambient instructions an AGENTS.md-native
     # runtime would.
+    inject_commands_env = os.getenv("HARNESS_BENCH_INJECT_AGENTS_MD_COMMANDS", "free-code,claude")
+    inject_commands = [cmd.strip() for cmd in inject_commands_env.split(",") if cmd.strip()]
     inject_agents_md = any(
-        "free-code" in arg or arg.endswith("/claude") or arg == "claude"
+        any(cmd in arg for cmd in inject_commands)
         for arg in base_argv[:2]
     )
 
@@ -576,6 +599,8 @@ def run_task_cli(
                 if workspace_keepalive is not None:
                     _cleanup_workspace_keepalive(workspace_keepalive, task_id=task.id)
                     workspace_keepalive = None
+                elif keep_workspace and workspace_path is not None:
+                    _cleanup_path(workspace_path, task_id=task.id)
                 delay = _BACKOFF_SCHEDULE[min(attempt, len(_BACKOFF_SCHEDULE) - 1)]
                 time.sleep(delay)
                 continue
@@ -611,6 +636,8 @@ def run_task_cli(
                     if workspace_keepalive is not None:
                         _cleanup_workspace_keepalive(workspace_keepalive, task_id=task.id)
                         workspace_keepalive = None
+                    elif keep_workspace and workspace_path is not None:
+                        _cleanup_path(workspace_path, task_id=task.id)
                     if keep_workspace:
                         workspace_path = Path(mkdtemp(prefix=f"hb_cli_prom_{task.id}_"))
                     else:

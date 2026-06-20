@@ -99,19 +99,23 @@ def _coerce_int(value: Any) -> int | None:
     return None
 
 
+def _first_not_none(*values: int | None) -> int | None:
+    return next((v for v in values if v is not None), None)
+
+
 def _usage_token_counts(usage: Any) -> tuple[int | None, int | None, int | None]:
     if not isinstance(usage, dict):
         return None, None, None
 
-    input_tokens = (
-        _coerce_int(usage.get("input_tokens"))
-        or _coerce_int(usage.get("prompt_tokens"))
-        or _coerce_int(usage.get("prompt_eval_count"))
+    input_tokens = _first_not_none(
+        _coerce_int(usage.get("input_tokens")),
+        _coerce_int(usage.get("prompt_tokens")),
+        _coerce_int(usage.get("prompt_eval_count")),
     )
-    output_tokens = (
-        _coerce_int(usage.get("output_tokens"))
-        or _coerce_int(usage.get("completion_tokens"))
-        or _coerce_int(usage.get("eval_count"))
+    output_tokens = _first_not_none(
+        _coerce_int(usage.get("output_tokens")),
+        _coerce_int(usage.get("completion_tokens")),
+        _coerce_int(usage.get("eval_count")),
     )
     total_tokens = _coerce_int(usage.get("total_tokens"))
     if total_tokens is None and (input_tokens is not None or output_tokens is not None):
@@ -243,8 +247,7 @@ class AgentRunStatsCollector:
         if invocation_result is not None:
             for key, value in agent_stats_from_result(invocation_result).items():
                 if (
-                    key.startswith("agent_")
-                    and key.endswith("_tokens")
+                    (key.startswith("agent_") and key.endswith("_tokens"))
                     or key == "agent_llm_calls"
                 ):
                     stats[key] = max(stats.get(key, 0), value)

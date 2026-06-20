@@ -343,17 +343,20 @@ def xlsx_cell_equals(rel: str, sheet: str, cell: str, expected: Any) -> Verifier
         if not p.exists():
             return VerifyResult(False, f"{rel} missing")
         wb = openpyxl.load_workbook(p, data_only=True)
-        if sheet not in wb.sheetnames:
-            return VerifyResult(False, f"{rel} has no sheet {sheet!r}; sheets={wb.sheetnames}")
-        value = wb[sheet][cell].value
-        if value == expected:
-            return VerifyResult(True, f"{rel}[{sheet}!{cell}] == {expected!r}")
         try:
-            if float(value) == float(expected):
-                return VerifyResult(True, f"{rel}[{sheet}!{cell}] ≈ {expected!r}")
-        except (TypeError, ValueError):
-            pass
-        return VerifyResult(False, f"{rel}[{sheet}!{cell}] = {value!r}, expected {expected!r}")
+            if sheet not in wb.sheetnames:
+                return VerifyResult(False, f"{rel} has no sheet {sheet!r}; sheets={wb.sheetnames}")
+            value = wb[sheet][cell].value
+            if value == expected:
+                return VerifyResult(True, f"{rel}[{sheet}!{cell}] == {expected!r}")
+            try:
+                if float(value) == float(expected):
+                    return VerifyResult(True, f"{rel}[{sheet}!{cell}] ≈ {expected!r}")
+            except (TypeError, ValueError):
+                pass
+            return VerifyResult(False, f"{rel}[{sheet}!{cell}] = {value!r}, expected {expected!r}")
+        finally:
+            wb.close()
 
     return _check
 
@@ -369,7 +372,7 @@ def sqlite_query_returns(rel: str, query: str, expected: Any) -> Verifier:
         if not p.exists():
             return VerifyResult(False, f"{rel} missing")
         try:
-            conn = sqlite3.connect(p)
+            conn = sqlite3.connect(f"file:{p.as_posix()}?mode=ro", uri=True)
             try:
                 row = conn.execute(query).fetchone()
             finally:
